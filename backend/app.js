@@ -2,6 +2,9 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 
+
+
+
 dotenv.config();
 
 const app = express();
@@ -10,10 +13,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Routes will be added here
-// Example:
-// import authRoutes from "./routes/authRoute.js";
-// app.use("/api/auth", authRoutes);
+//imports
+
+import authRoutes from "./routes/authRoutes.js";
+
+
+// Routes 
+app.use("/api/auth", authRoutes);
+
+
+
 
 app.get("/", (req, res) => {
     res.json({
