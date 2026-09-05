@@ -10,6 +10,7 @@ import { ApprovalDetail } from './pages/ApprovalDetail';
 import { Fulfillment } from './pages/Fulfillment';
 import { FulfillmentDetail } from './pages/FulfillmentDetail';
 import { Subscriptions } from './pages/Subscriptions';
+import { BillingDetail } from './pages/BillingDetail';
 
 export function App() {
   return (
@@ -26,6 +27,7 @@ export function App() {
         <Route path="/fulfillment" element={<Fulfillment />} />
         <Route path="/fulfillment/:orderId" element={<FulfillmentDetail />} />
         <Route path="/subscriptions" element={<Subscriptions />} />
+        <Route path="/subscriptions/:subscriptionId" element={<BillingDetail />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
