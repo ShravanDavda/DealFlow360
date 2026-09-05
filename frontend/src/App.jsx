@@ -5,6 +5,7 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Quotations } from './pages/Quotations';
 import { QuotationDetail } from './pages/QuotationDetail';
+import { Approvals } from './pages/Approvals';
 
 export function App() {
   return (
@@ -16,6 +17,7 @@ export function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/quotations" element={<Quotations />} />
         <Route path="/quotations/:quotationId" element={<QuotationDetail />} />
+        <Route path="/approvals" element={<Approvals />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
