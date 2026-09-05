@@ -4,6 +4,7 @@ import { Register } from './pages/Register';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Quotations } from './pages/Quotations';
+import { QuotationDetail } from './pages/QuotationDetail';
 
 export function App() {
   return (
@@ -14,6 +15,7 @@ export function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/quotations" element={<Quotations />} />
+        <Route path="/quotations/:quotationId" element={<QuotationDetail />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
