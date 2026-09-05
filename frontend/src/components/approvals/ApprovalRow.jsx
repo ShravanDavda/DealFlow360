@@ -17,7 +17,7 @@ export const ApprovalRow = ({ approval, onClick }) => {
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      onClick(approval.quotationId);
+      onClick(approval.id || approval.quotationId);
     }
   };
 
@@ -25,7 +25,7 @@ export const ApprovalRow = ({ approval, onClick }) => {
 
   return (
     <tr
-      onClick={() => onClick(approval.quotationId)}
+      onClick={() => onClick(approval.id || approval.quotationId)}
       onKeyDown={handleKeyDown}
       tabIndex={0}
       role="button"

@@ -6,6 +6,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Quotations } from './pages/Quotations';
 import { QuotationDetail } from './pages/QuotationDetail';
 import { Approvals } from './pages/Approvals';
+import { ApprovalDetail } from './pages/ApprovalDetail';
 
 export function App() {
   return (
@@ -18,6 +19,7 @@ export function App() {
         <Route path="/quotations" element={<Quotations />} />
         <Route path="/quotations/:quotationId" element={<QuotationDetail />} />
         <Route path="/approvals" element={<Approvals />} />
+        <Route path="/approvals/:approvalId" element={<ApprovalDetail />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
