@@ -18,6 +18,7 @@ import { DealHealth } from './pages/DealHealth';
 import { Reports } from './pages/Reports';
 import { Products } from './pages/Products';
 import { ProductDetail } from './pages/ProductDetail';
+import { DiscountApprovalSettings } from './pages/DiscountApprovalSettings';
 
 export function App() {
   return (
@@ -43,6 +44,7 @@ export function App() {
         <Route path="/reports" element={<Reports />} />
         <Route path="/products" element={<Products />} />
         <Route path="/products/:productId" element={<ProductDetail />} />
+        <Route path="/settings/discount-approval" element={<DiscountApprovalSettings />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
