@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  User, 
   Mail, 
   Eye, 
   EyeOff, 
@@ -11,12 +10,11 @@ import {
 } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
-import { registerUser } from '../services/authService';
+import { loginUser } from '../services/authService';
 
-export const Register = () => {
+export const Login = () => {
   // Form states
   const [formData, setFormData] = useState({
-    username: '',
     email: '',
     password: '',
   });
@@ -31,12 +29,6 @@ export const Register = () => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.username.trim()) {
-      newErrors.username = 'Username is required';
-    } else if (formData.username.length < 3) {
-      newErrors.username = 'Username must be at least 3 characters';
-    }
-
     if (!formData.email.trim()) {
       newErrors.email = 'Email address is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
@@ -45,8 +37,6 @@ export const Register = () => {
 
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
     }
 
     setErrors(newErrors);
@@ -82,18 +72,20 @@ export const Register = () => {
     setIsLoading(true);
 
     try {
-      const response = await registerUser({
-        username: formData.username.trim(),
+      const response = await loginUser({
         email: formData.email.trim(),
         password: formData.password,
       });
 
-      setSuccessMessage(response?.message || 'Account created successfully!');
-      
-      // Clear form
-      setFormData({ username: '', email: '', password: '' });
+      // Store JWT token if provided by the backend response
+      const token = response?.token || response?.data?.token;
+      if (token) {
+        localStorage.setItem('token', token);
+      }
+
+      setSuccessMessage(response?.message || 'Logged in successfully!');
     } catch (err) {
-      setServerError(err.message || 'Registration failed. Please try again.');
+      setServerError(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -109,10 +101,10 @@ export const Register = () => {
           </div>
         </div>
         <h2 className="mt-5 text-center text-2xl font-bold tracking-tight text-slate-900">
-          Create your account
+          Sign in to your account
         </h2>
         <p className="mt-1.5 text-center text-sm text-slate-600">
-          Enter your details below to get started with your workspace
+          Enter your email and password to access your workspace
         </p>
       </div>
 
@@ -141,27 +133,6 @@ export const Register = () => {
 
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             
-            {/* Username Field */}
-            <div>
-              <div className="relative">
-                <Input
-                  id="username"
-                  name="username"
-                  type="text"
-                  label="Username"
-                  placeholder="e.g. rahul123"
-                  value={formData.username}
-                  onChange={handleChange}
-                  error={errors.username}
-                  autoComplete="username"
-                  required
-                />
-                <div className="absolute right-3 top-9 text-slate-400 pointer-events-none">
-                  <User className="h-4 w-4" />
-                </div>
-              </div>
-            </div>
-
             {/* Email Field */}
             <div>
               <div className="relative">
@@ -195,7 +166,7 @@ export const Register = () => {
                   value={formData.password}
                   onChange={handleChange}
                   error={errors.password}
-                  autoComplete="new-password"
+                  autoComplete="current-password"
                   required
                 />
                 <button
@@ -211,9 +182,6 @@ export const Register = () => {
                   )}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-slate-500">
-                Must be at least 6 characters long
-              </p>
             </div>
 
             {/* Submit Button */}
@@ -223,19 +191,19 @@ export const Register = () => {
                 variant="primary"
                 isLoading={isLoading}
               >
-                Create account
+                Sign in
               </Button>
             </div>
           </form>
 
-          {/* Switch to Login link */}
+          {/* Switch to Register link */}
           <div className="mt-6 text-center text-sm text-slate-600 border-t border-slate-100 pt-5">
-            Already have an account?{' '}
+            Don't have an account?{' '}
             <Link 
-              to="/login" 
+              to="/register" 
               className="font-medium text-slate-900 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-900 rounded"
             >
-              Sign in
+              Sign up
             </Link>
           </div>
         </div>
@@ -244,4 +212,4 @@ export const Register = () => {
   );
 };
 
-export default Register;
+export default Login;
