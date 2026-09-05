@@ -12,6 +12,7 @@ import { FulfillmentDetail } from './pages/FulfillmentDetail';
 import { Subscriptions } from './pages/Subscriptions';
 import { BillingDetail } from './pages/BillingDetail';
 import { CustomerPortal } from './pages/CustomerPortal';
+import { Invoices } from './pages/Invoices';
 
 export function App() {
   return (
@@ -31,6 +32,7 @@ export function App() {
         <Route path="/subscriptions/:subscriptionId" element={<BillingDetail />} />
         <Route path="/customer/quotes" element={<Navigate to="/customer/quotes/Q-1042" replace />} />
         <Route path="/customer/quotes/:quoteId" element={<CustomerPortal />} />
+        <Route path="/invoices" element={<Invoices />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
