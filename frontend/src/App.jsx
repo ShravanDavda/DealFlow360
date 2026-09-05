@@ -17,7 +17,7 @@ import { InvoiceDetail } from './pages/InvoiceDetail';
 import { DealHealth } from './pages/DealHealth';
 import { Reports } from './pages/Reports';
 import { Products } from './pages/Products';
-import { ProductDetailPlaceholder } from './pages/ProductDetailPlaceholder';
+import { ProductDetail } from './pages/ProductDetail';
 
 export function App() {
   return (
@@ -42,7 +42,7 @@ export function App() {
         <Route path="/deal-health" element={<DealHealth />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/products" element={<Products />} />
-        <Route path="/products/:productId" element={<ProductDetailPlaceholder />} />
+        <Route path="/products/:productId" element={<ProductDetail />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
