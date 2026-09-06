@@ -3,7 +3,8 @@ import {
     getPriceListById,
     createPriceList,
     updatePriceList,
-    deactivatePriceList
+    deactivatePriceList,
+    deletePriceList
 } from "../services/priceListService.js";
 
 const getPriceLists = async (
@@ -170,10 +171,38 @@ const deactivateExistingPriceList =
         }
     };
 
+const deleteExistingPriceList =
+    async (req, res) => {
+        try {
+            const priceList =
+                await deletePriceList(
+                    req.params.id
+                );
+
+            res.status(200).json({
+                success: true,
+                message:
+                    "Price list deleted successfully",
+                data: priceList
+            });
+        } catch (error) {
+            console.error(
+                "Delete price list error:",
+                error
+            );
+
+            res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
+    };
+
 export {
     getPriceLists,
     getPriceList,
     createNewPriceList,
     updateExistingPriceList,
-    deactivateExistingPriceList
+    deactivateExistingPriceList,
+    deleteExistingPriceList
 };

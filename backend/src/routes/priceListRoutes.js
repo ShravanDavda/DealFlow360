@@ -5,7 +5,8 @@ import {
     getPriceList,
     createNewPriceList,
     updateExistingPriceList,
-    deactivateExistingPriceList
+    deactivateExistingPriceList,
+    deleteExistingPriceList
 } from "../controllers/priceListController.js";
 
 import authenticateToken from "../middleware/authMiddleware.js";
@@ -40,6 +41,11 @@ router.put(
 router.patch(
     "/:id/deactivate",
     deactivateExistingPriceList
+);
+
+router.delete(
+    "/:id",
+    deleteExistingPriceList
 );
 
 export default router;

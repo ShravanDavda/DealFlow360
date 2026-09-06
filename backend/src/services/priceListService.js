@@ -236,10 +236,37 @@ const deactivatePriceList = async (id) => {
     return result.rows[0];
 };
 
+const deletePriceList = async (id) => {
+    const existingPriceList = await getPriceListById(id);
+
+    if (!existingPriceList) {
+        throw new Error("Price list not found");
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        await client.query("DELETE FROM price_list_items WHERE price_list_id = $1", [id]);
+        await client.query("UPDATE quotations SET price_list_id = NULL WHERE price_list_id = $1", [id]);
+        const result = await client.query(
+            "DELETE FROM price_lists WHERE id = $1 RETURNING id, name",
+            [id]
+        );
+        await client.query("COMMIT");
+        return result.rows[0];
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+};
+
 export {
     getAllPriceLists,
     getPriceListById,
     createPriceList,
     updatePriceList,
-    deactivatePriceList
+    deactivatePriceList,
+    deletePriceList
 };

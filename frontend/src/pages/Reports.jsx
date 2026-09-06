@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, BarChart3, FileDown, Sheet } from 'lucide-react';
+import { CheckCircle2, BarChart3, FileText, Sheet } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import { DashboardNavbar } from '../components/dashboard/DashboardNavbar';
 import { ReportFilters } from '../components/reports/ReportFilters';
 import { ReportSummary } from '../components/reports/ReportSummary';
@@ -51,17 +52,230 @@ export const Reports = () => {
   };
 
   const handleExportPDF = () => {
-    const text = `DEALFLOW360 EXECUTIVE REPORT\nPeriod: ${selectedFilters.period}\nTeam: ${selectedFilters.salesTeam}\nQuotes Created: ${reportData.metrics?.quotesCreated}\nAvg Approval Time: ${reportData.metrics?.avgApprovalTime}\nTop Upsell: ${reportData.metrics?.topUpsellProduct}\n`;
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `dealflow360-report-${selectedFilters.period.toLowerCase().replace(' ', '-')}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
 
-    setFeedbackMessage('Executive PDF/Text report exported successfully.');
-    setTimeout(() => setFeedbackMessage(''), 4500);
+      // Top brand accent line
+      doc.setFillColor(15, 23, 42);
+      doc.rect(0, 0, 210, 6, 'F');
+
+      // Title & Header
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(22);
+      doc.setTextColor(15, 23, 42);
+      doc.text('DealFlow360', 20, 24);
+
+      doc.setFillColor(241, 245, 249);
+      doc.setDrawColor(203, 213, 225);
+      doc.roundedRect(80, 18, 28, 8, 2, 2, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(51, 65, 85);
+      doc.text('REPORT', 87, 23.5);
+
+      // Subtitle
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105);
+      doc.text('Admin & Operations Reporting Dashboard', 20, 31);
+
+      // Generation Metadata
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      const generatedDate = new Date().toLocaleString('en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
+      doc.text(`Generated: ${generatedDate}`, 190, 24, { align: 'right' });
+      doc.text('Status: Live Snapshot', 190, 30, { align: 'right' });
+
+      // Horizontal Divider
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(20, 37, 190, 37);
+
+      // SECTION 1: REPORT FILTERS
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      doc.text('APPLIED FILTER CRITERIA', 20, 46);
+
+      // Filter container card
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(20, 50, 170, 32, 2, 2, 'FD');
+
+      // Filter grid
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text('PERIOD:', 26, 59);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(15, 23, 42);
+      doc.text(String(selectedFilters.period || 'This Month'), 60, 59);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139);
+      doc.text('APPROVAL STATUS:', 110, 59);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(15, 23, 42);
+      doc.text(String(selectedFilters.approvalStatus || 'All'), 148, 59);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139);
+      doc.text('SALES TEAM:', 26, 72);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(15, 23, 42);
+      doc.text(String(selectedFilters.salesTeam || 'All Teams'), 60, 72);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139);
+      doc.text('PRODUCT:', 110, 72);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(15, 23, 42);
+      doc.text(String(selectedFilters.product || 'All Products'), 148, 72);
+
+      // SECTION 2: KEY PERFORMANCE METRICS
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      doc.text('KEY REPORTING METRICS', 20, 94);
+
+      const quotesCount = reportData.metrics?.quotesCreated ?? 0;
+      const approvalTime = reportData.metrics?.avgApprovalTime ?? '0.0 hours';
+      const topUpsell = reportData.metrics?.topUpsellProduct ?? 'None';
+
+      // KPI Card 1: Quotes Created
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(20, 99, 52, 40, 2, 2, 'FD');
+      doc.setFillColor(59, 130, 246);
+      doc.rect(20, 99, 52, 2, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text('QUOTES CREATED', 25, 109);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(20);
+      doc.setTextColor(15, 23, 42);
+      doc.text(String(quotesCount), 25, 122);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184);
+      doc.text(String(selectedFilters.period || 'This Month'), 25, 131);
+
+      // KPI Card 2: Avg Approval Time
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(79, 99, 52, 40, 2, 2, 'FD');
+      doc.setFillColor(245, 158, 11);
+      doc.rect(79, 99, 52, 2, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text('AVG APPROVAL TIME', 84, 109);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(17);
+      doc.setTextColor(15, 23, 42);
+      doc.text(String(approvalTime), 84, 122);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184);
+      doc.text('Turnaround efficiency', 84, 131);
+
+      // KPI Card 3: Top Upsell Product
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(138, 99, 52, 40, 2, 2, 'FD');
+      doc.setFillColor(16, 185, 129);
+      doc.rect(138, 99, 52, 2, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text('TOP UPSELL PRODUCT', 143, 109);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(15, 23, 42);
+      const truncatedUpsell = String(topUpsell).length > 17 ? String(topUpsell).substring(0, 17) + '...' : String(topUpsell);
+      doc.text(truncatedUpsell, 143, 122);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184);
+      doc.text('Highest volume upsell', 143, 131);
+
+      // SECTION 3: REPORT SUMMARY BREAKDOWN
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      doc.text('METRICS SUMMARY TABLE', 20, 153);
+
+      // Table Header
+      doc.setFillColor(241, 245, 249);
+      doc.rect(20, 158, 170, 8, 'F');
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(20, 158, 170, 8, 'S');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      doc.text('METRIC / PARAMETER', 25, 163.5);
+      doc.text('VALUE', 105, 163.5);
+      doc.text('SCOPE / NOTES', 150, 163.5);
+
+      // Table Rows
+      const tableRows = [
+        { label: 'Reporting Period', value: String(selectedFilters.period), notes: 'Selected timeframe' },
+        { label: 'Assigned Sales Team', value: String(selectedFilters.salesTeam), notes: 'Team filter' },
+        { label: 'Approval Status', value: String(selectedFilters.approvalStatus), notes: 'Workflow status' },
+        { label: 'Product Filter', value: String(selectedFilters.product), notes: 'Catalog focus' },
+        { label: 'Total Quotes Created', value: String(quotesCount), notes: 'Volume generated' },
+        { label: 'Average Approval Time', value: String(approvalTime), notes: 'Approval duration' },
+        { label: 'Top Upsell Product', value: String(topUpsell), notes: 'Leading accessory/item' },
+      ];
+
+      let currentY = 166;
+      tableRows.forEach((row, index) => {
+        if (index % 2 === 1) {
+          doc.setFillColor(248, 250, 252);
+          doc.rect(20, currentY, 170, 8, 'F');
+        }
+        doc.setDrawColor(226, 232, 240);
+        doc.rect(20, currentY, 170, 8, 'S');
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(15, 23, 42);
+        doc.text(row.label, 25, currentY + 5.5);
+        doc.text(row.value, 105, currentY + 5.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(row.notes, 150, currentY + 5.5);
+
+        currentY += 8;
+      });
+
+      // FOOTER
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(20, 268, 190, 268);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184);
+      doc.text('DealFlow360 Executive Reporting Dashboard - Confidential', 20, 274);
+      doc.text('Page 1 of 1', 190, 274, { align: 'right' });
+
+      doc.save('DealFlow360_Report.pdf');
+
+      setFeedbackMessage('Executive PDF report exported successfully.');
+      setTimeout(() => setFeedbackMessage(''), 4500);
+    } catch (err) {
+      console.error('Failed to export PDF report:', err);
+      setFeedbackMessage('Failed to export PDF report.');
+      setTimeout(() => setFeedbackMessage(''), 4500);
+    }
   };
 
   const handleExportXLS = async () => {
@@ -143,8 +357,8 @@ export const Reports = () => {
             onClick={handleExportPDF}
             className="sm:!w-auto px-5 gap-2 border-slate-300 text-slate-700 hover:bg-slate-100"
           >
-            <FileDown className="h-4 w-4 text-slate-600" />
-            <span>Export Summary</span>
+            <FileText className="h-4 w-4 text-slate-600" />
+            <span>Export PDF</span>
           </Button>
 
           <Button
