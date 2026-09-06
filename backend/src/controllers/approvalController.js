@@ -36,7 +36,7 @@ export const getApprovalDetail = async (req, res, next) => {
 
 export const approve = async (req, res, next) => {
     try {
-        if (req.user.role === "sales_rep" || req.user.role === "admin") return res.status(403).json({ success: false, message: "This role cannot approve quotations" });
+        if (req.user.role === "sales_rep") return res.status(403).json({ success: false, message: "This role cannot approve quotations" });
         const { approvalId } = req.params;
         const result = await approvalService.approveQuotation(cleanApprovalId(approvalId), req.user.userId, req.body.comment || req.body.note);
 
@@ -52,7 +52,7 @@ export const approve = async (req, res, next) => {
 
 export const reject = async (req, res, next) => {
     try {
-        if (req.user.role === "sales_rep" || req.user.role === "admin") return res.status(403).json({ success: false, message: "This role cannot reject quotations" });
+        if (req.user.role === "sales_rep") return res.status(403).json({ success: false, message: "This role cannot reject quotations" });
         const { approvalId } = req.params;
         const result = await approvalService.rejectQuotation(cleanApprovalId(approvalId), req.user.userId, req.body.comment || req.body.reason);
 
@@ -68,7 +68,7 @@ export const reject = async (req, res, next) => {
 
 export const returnForRevision = async (req, res, next) => {
     try {
-        if (req.user.role === "sales_rep" || req.user.role === "admin") return res.status(403).json({ success: false, message: "This role cannot return quotations for revision" });
+        if (req.user.role === "sales_rep") return res.status(403).json({ success: false, message: "This role cannot return quotations for revision" });
         const { approvalId } = req.params;
         const result = await approvalService.returnForRevision(cleanApprovalId(approvalId), req.user.userId, req.body.comment || req.body.note);
 

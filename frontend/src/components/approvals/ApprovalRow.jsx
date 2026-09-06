@@ -46,7 +46,43 @@ export const ApprovalRow = ({ approval, onClick, onAction, isSalesManager, isFin
       </td>
       <td className="max-w-[220px] px-3 py-4 text-xs text-slate-600">{approval.reasonRequired || '--'}</td>
       <td className="px-3 py-4" onClick={(event) => event.stopPropagation()}>
-        {(isSalesManager && approval.status === 'Pending' && approval.currentStep === 'Sales Manager') || (isFinanceOperations && approval.status === 'Pending' && String(approval.currentStep || '').toLowerCase() === 'finance') ? <div className="flex flex-wrap justify-end gap-1.5"><button type="button" onClick={() => onAction(approval, 'approve')} className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700">Approve</button><button type="button" onClick={() => onAction(approval, 'return')} className="rounded bg-amber-500 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-600">Return</button><button type="button" onClick={() => onAction(approval, 'reject')} className="rounded bg-rose-600 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-700">Reject</button></div> : <span className="text-xs text-slate-400">View →</span>}
+        {((isSalesManager && (approval.status === 'Pending' || approval.status === 'Pending Approval') && (approval.currentStep === 'Sales Manager' || !approval.currentStep)) || 
+          (isFinanceOperations && (approval.status === 'Pending' || approval.status === 'Pending Approval') && (String(approval.currentStep || '').toLowerCase() === 'finance' || !approval.currentStep))) ? (
+          <div className="flex flex-wrap justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAction(approval, 'approve');
+              }}
+              className="rounded bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 shadow-sm transition-colors cursor-pointer active:scale-95"
+            >
+              Approve
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAction(approval, 'return');
+              }}
+              className="rounded bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-600 shadow-sm transition-colors cursor-pointer active:scale-95"
+            >
+              Return
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAction(approval, 'reject');
+              }}
+              className="rounded bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700 shadow-sm transition-colors cursor-pointer active:scale-95"
+            >
+              Reject
+            </button>
+          </div>
+        ) : (
+          <span className="text-xs text-slate-400">View →</span>
+        )}
       </td>
     </tr>
   );

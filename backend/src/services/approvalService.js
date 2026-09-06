@@ -3,11 +3,12 @@ import { calculateQuotation } from "./quotationCalculationService.js";
 import { getQuotationByCodeOrId } from "./quotationService.js";
 
 const roleAliases = {
-    finance: new Set(["finance", "operations"]),
-    operations: new Set(["finance", "operations"]),
-    "sales manager": new Set(["sales_manager"]),
-    sales_manager: new Set(["sales_manager"]),
-    salesmanager: new Set(["sales_manager"])
+    finance: new Set(["finance", "operations", "admin"]),
+    operations: new Set(["finance", "operations", "admin"]),
+    "sales manager": new Set(["sales_manager", "admin"]),
+    sales_manager: new Set(["sales_manager", "admin"]),
+    salesmanager: new Set(["sales_manager", "admin"]),
+    admin: new Set(["admin", "sales_manager", "finance", "operations"])
 };
 const normalizeRole = (role) => String(role || "").toLowerCase().replace(/-/g, "_");
 const allowedRoles = (role) => roleAliases[normalizeRole(role)] || new Set([normalizeRole(role)]);
@@ -197,7 +198,7 @@ export const getApprovalDetail = async (codeOrId) => {
         customerName: quote.customerName,
         customerTier: quote.customerTier,
         blendedRisk: quote.blendedRisk,
-        status: quote.status,
+        status: quote.status === "Pending Approval" ? "Pending" : quote.status,
         approvalStage: quote.approvalStage,
         riskLines: quote.products.map((item) => ({
             id: `RL-${item.dbId}`,

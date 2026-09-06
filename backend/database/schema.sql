@@ -10,20 +10,14 @@ CREATE TABLE IF NOT EXISTS customer_tiers (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS discount_ceiling NUMERIC(5, 2) NOT NULL DEFAULT 10.00;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS unit VARCHAR(50) DEFAULT 'Each';
-ALTER TABLE products ADD COLUMN IF NOT EXISTS tax_percent NUMERIC(5, 2) DEFAULT 0;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS is_subscription BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS recurring_cycle VARCHAR(50);
-ALTER TABLE customers ADD COLUMN IF NOT EXISTS currency VARCHAR(10) NOT NULL DEFAULT 'USD';
 
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
-    role VARCHAR(30) NOT NULL DEFAULT 'sales_rep' CHECK (role IN ('admin', 'sales_rep', 'sales_manager', 'finance', 'operations')),
-    requested_role VARCHAR(30) CHECK (requested_role IN ('admin', 'sales_rep', 'sales_manager', 'finance', 'operations')),
+    role VARCHAR(30) NOT NULL DEFAULT 'sales_rep' CHECK (role IN ('admin', 'sales_rep', 'sales_manager', 'finance', 'operations', 'customer')),
+    requested_role VARCHAR(30) CHECK (requested_role IN ('admin', 'sales_rep', 'sales_manager', 'finance', 'operations', 'customer')),
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -52,6 +46,9 @@ CREATE TABLE IF NOT EXISTS customers (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS customer_id INTEGER REFERENCES customers(id) ON UPDATE CASCADE ON DELETE SET NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';
 
 CREATE TABLE IF NOT EXISTS categories (
     id SERIAL PRIMARY KEY,
@@ -115,6 +112,24 @@ CREATE TABLE IF NOT EXISTS price_list_items (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS discount_rules (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    customer_tier_id INTEGER REFERENCES customer_tiers(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    category_id INTEGER REFERENCES categories(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    product_id INTEGER REFERENCES products(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    min_quantity INTEGER DEFAULT 1,
+    max_quantity INTEGER,
+    discount_percentage NUMERIC(5, 2) NOT NULL DEFAULT 0,
+    max_discount_percent NUMERIC(5, 2),
+    discount_ceiling NUMERIC(5, 2),
+    approval_required BOOLEAN NOT NULL DEFAULT FALSE,
+    approval_level INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS warehouses (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
@@ -171,6 +186,7 @@ CREATE TABLE IF NOT EXISTS quotation_items (
     discount_limit NUMERIC(5, 2) NOT NULL DEFAULT 0,
     line_total NUMERIC(12, 2) NOT NULL,
     margin_percent NUMERIC(5, 2) NOT NULL DEFAULT 0,
+    tax_percent NUMERIC(5, 2) NOT NULL DEFAULT 0,
     risk_status VARCHAR(50) NOT NULL DEFAULT 'OK',
     is_recurring BOOLEAN NOT NULL DEFAULT FALSE,
     recurring_cycle VARCHAR(50),
@@ -284,12 +300,17 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON UPDATE CASCADE ON DELETE CASCADE,
     quotation_item_id INTEGER REFERENCES quotation_items(id) ON UPDATE CASCADE ON DELETE SET NULL,
     product_id INTEGER REFERENCES products(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    item_name VARCHAR(255),
     description TEXT,
     quantity NUMERIC(10, 2) NOT NULL DEFAULT 1,
     unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
     discount_percent NUMERIC(5, 2) DEFAULT 0,
     tax_percent NUMERIC(5, 2) DEFAULT 0,
+    discount_amount NUMERIC(12, 2) DEFAULT 0,
+    tax_amount NUMERIC(12, 2) DEFAULT 0,
     line_total NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    amount NUMERIC(12, 2) DEFAULT 0,
+    total NUMERIC(12, 2) DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -323,7 +344,27 @@ CREATE TABLE IF NOT EXISTS product_pairings (
     tag VARCHAR(100) DEFAULT 'Frequently Bought Together',
     margin_delta NUMERIC(12, 2) DEFAULT 25.00,
     priority INTEGER DEFAULT 1,
+    relationship_type VARCHAR(20) NOT NULL DEFAULT 'CROSS_SELL' CHECK (relationship_type IN ('UPSELL', 'CROSS_SELL')),
     is_active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS approval_chains (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    min_discount_percent NUMERIC(5, 2) NOT NULL DEFAULT 0,
+    max_discount_percent NUMERIC(5, 2),
+    min_risk VARCHAR(20),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS approval_chain_steps (
+    id SERIAL PRIMARY KEY,
+    approval_chain_id INTEGER NOT NULL REFERENCES approval_chains(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    step_order INTEGER NOT NULL CHECK (step_order > 0),
+    approver_role VARCHAR(50) NOT NULL,
+    UNIQUE (approval_chain_id, step_order)
 );
 
 CREATE TABLE IF NOT EXISTS quotation_approval_requests (
@@ -354,25 +395,6 @@ CREATE INDEX IF NOT EXISTS idx_approval_requests_quotation ON quotation_approval
 CREATE INDEX IF NOT EXISTS idx_approval_requests_status ON quotation_approval_requests (status);
 CREATE INDEX IF NOT EXISTS idx_approval_steps_request_status ON quotation_approval_steps (approval_request_id, status);
 CREATE INDEX IF NOT EXISTS idx_approval_steps_role ON quotation_approval_steps (approver_role);
-
-CREATE TABLE IF NOT EXISTS approval_chains (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    min_discount_percent NUMERIC(5, 2) NOT NULL DEFAULT 0,
-    max_discount_percent NUMERIC(5, 2),
-    min_risk VARCHAR(20),
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS approval_chain_steps (
-    id SERIAL PRIMARY KEY,
-    approval_chain_id INTEGER NOT NULL REFERENCES approval_chains(id) ON UPDATE CASCADE ON DELETE CASCADE,
-    step_order INTEGER NOT NULL CHECK (step_order > 0),
-    approver_role VARCHAR(50) NOT NULL,
-    UNIQUE (approval_chain_id, step_order)
-);
 
 CREATE TABLE IF NOT EXISTS subscription_plans (
     id SERIAL PRIMARY KEY,

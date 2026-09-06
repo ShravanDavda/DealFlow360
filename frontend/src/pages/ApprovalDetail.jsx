@@ -43,8 +43,15 @@ export const ApprovalDetail = () => {
     getCurrentUser().then((response) => setUserRole(response?.data?.role || null)).catch(() => setUserRole(null));
   }, [approvalId]);
 
-  const currentStep = String(approval?.approval?.steps?.find((step) => step.status === 'PENDING')?.approverRole || approval?.currentStep || approval?.approvalStage || '').toLowerCase();
-  const canAct = approval?.status === 'Pending' && ((userRole === 'sales_manager' && currentStep === 'sales manager') || (['finance', 'operations'].includes(userRole) && currentStep === 'finance'));
+  const currentStep = String(approval?.approval?.steps?.find((step) => step.status === 'PENDING')?.approverRole || approval?.currentStep || approval?.approvalStage || '').toLowerCase().replace(/_/g, ' ');
+  const isPending = approval?.status === 'Pending' || approval?.status === 'Pending Approval';
+  const isAdmin = userRole === 'admin';
+  const isManagerStep = currentStep === 'sales manager' || !currentStep;
+  const isFinanceStep = currentStep === 'finance' || !currentStep;
+  const canAct = isPending && (
+    ((userRole === 'sales_manager' || isAdmin) && isManagerStep) ||
+    ((['finance', 'operations'].includes(userRole) || isAdmin) && isFinanceStep)
+  );
 
   const handleApprove = async () => {
     try {

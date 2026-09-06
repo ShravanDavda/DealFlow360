@@ -105,7 +105,7 @@ export function App() {
         <Route path="/customer/quotes/:quoteId" element={<RoleGuard allowedRoles={['customer', 'admin']}><CustomerPortal /></RoleGuard>} />
         <Route path="/invoices" element={<RoleGuard allowedRoles={['admin', 'finance', 'operations']}><Invoices /></RoleGuard>} />
         <Route path="/invoices/:invoiceId" element={<RoleGuard allowedRoles={['admin', 'finance', 'operations']}><InvoiceDetail /></RoleGuard>} />
-        <Route path="/deal-health" element={<RoleGuard allowedRoles={['sales_manager']}><DealHealth /></RoleGuard>} />
+        <Route path="/deal-health" element={<Navigate to="/dashboard" replace />} />
         <Route path="/reports" element={<RoleGuard allowedRoles={['admin', 'sales_manager']}><Reports /></RoleGuard>} />
         <Route path="/products" element={<Products />} />
         <Route path="/products/:productId" element={<ProductDetail />} />

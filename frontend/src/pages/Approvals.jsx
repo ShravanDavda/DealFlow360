@@ -19,13 +19,15 @@ export const Approvals = () => {
   ]);
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
-  const isSalesManager = userRole === 'sales_manager';
-  const isFinanceOperations = ['finance', 'operations'].includes(userRole);
+  const [feedback, setFeedback] = useState(null);
+  const isAdmin = userRole === 'admin';
+  const isSalesManager = userRole === 'sales_manager' || isAdmin;
+  const isFinanceOperations = ['finance', 'operations'].includes(userRole) || isAdmin;
 
   const fetchApprovalsData = async (mode = filterMode) => {
     try {
       setIsLoading(true);
-      const data = await getApprovals({ status: mode === 'high-risk' ? 'all' : mode, ...(isSalesManager ? { role: 'Sales Manager' } : isFinanceOperations ? { role: 'Finance' } : {}) });
+      const data = await getApprovals({ status: mode === 'high-risk' ? 'all' : mode, ...(isSalesManager && !isAdmin ? { role: 'Sales Manager' } : isFinanceOperations && !isAdmin ? { role: 'Finance' } : {}) });
       if (data) {
         if (data.approvals) setApprovals(data.approvals);
         if (data.summary) setSummary(data.summary);
@@ -43,21 +45,31 @@ export const Approvals = () => {
 
   useEffect(() => {
     fetchApprovalsData(filterMode);
-  }, [filterMode, isSalesManager]);
+  }, [filterMode, isSalesManager, isFinanceOperations]);
 
   const handleRowClick = (quotationId) => {
     navigate(`/approvals/${quotationId}`);
   };
 
   const handleAction = async (approval, action) => {
-    if (!window.confirm(`${action === 'approve' ? 'Approve' : action === 'reject' ? 'Reject' : 'Return'} ${approval.quotationId}?`)) return;
+    const targetId = approval.quotationId || approval.id;
     try {
-      if (action === 'approve') await approveQuotation(approval.quotationId, { note: 'Approved discount terms within authority' });
-      if (action === 'reject') await rejectQuotation(approval.quotationId, { reason: 'Discount exceeds policy threshold without margin justification' });
-      if (action === 'return') await returnForRevision(approval.quotationId, { note: 'Returned to sales rep for line discount reduction' });
+      if (action === 'approve') {
+        await approveQuotation(targetId, { note: 'Approved discount terms within authority' });
+        setFeedback({ type: 'success', message: `Quotation ${targetId} approved successfully!` });
+      } else if (action === 'reject') {
+        await rejectQuotation(targetId, { reason: 'Discount exceeds policy threshold without margin justification' });
+        setFeedback({ type: 'success', message: `Quotation ${targetId} rejected.` });
+      } else if (action === 'return') {
+        await returnForRevision(targetId, { note: 'Returned to sales rep for line discount reduction' });
+        setFeedback({ type: 'success', message: `Quotation ${targetId} returned for revision.` });
+      }
+      setTimeout(() => setFeedback(null), 5000);
       await fetchApprovalsData(filterMode);
     } catch (error) {
       console.error(`Failed to ${action} quotation:`, error);
+      setFeedback({ type: 'error', message: error?.message || error?.data?.message || `Failed to ${action} quotation ${targetId}.` });
+      setTimeout(() => setFeedback(null), 5000);
     }
   };
 
@@ -93,6 +105,13 @@ export const Approvals = () => {
             <span>Refresh Queue</span>
           </button>
         </div>
+
+        {feedback && (
+          <div className={`p-4 rounded-lg flex items-center justify-between text-sm font-medium ${feedback.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
+            <span>{feedback.message}</span>
+            <button type="button" onClick={() => setFeedback(null)} className="text-xs font-semibold underline hover:opacity-75">Dismiss</button>
+          </div>
+        )}
 
         <section aria-label="Approvals Summary">
           <ApprovalSummary summary={summary} />

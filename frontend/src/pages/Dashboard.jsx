@@ -52,9 +52,9 @@ export const Dashboard = () => {
       id: 'at-risk-deals',
       title: 'At-Risk Deals',
       value: metrics.atRiskDeals,
-      supportingText: `${metrics.atRiskDeals} flagged by Deal Health`,
+      supportingText: `${metrics.atRiskDeals} high-risk deals in pipeline`,
       icon: <AlertTriangle className="h-5 w-5 text-rose-600" />,
-      onClick: () => navigate('/deal-health')
+      onClick: () => navigate('/quotations')
     },
   ];
 
