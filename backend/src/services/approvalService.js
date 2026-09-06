@@ -2,23 +2,33 @@ import pool from "../config/db.js";
 import { calculateQuotation } from "./quotationCalculationService.js";
 import { getQuotationByCodeOrId } from "./quotationService.js";
 
-const roleAliases = {
-    finance: new Set(["finance", "operations", "admin"]),
-    operations: new Set(["finance", "operations", "admin"]),
-    "sales manager": new Set(["sales_manager", "admin"]),
-    sales_manager: new Set(["sales_manager", "admin"]),
-    salesmanager: new Set(["sales_manager", "admin"]),
-    admin: new Set(["admin", "sales_manager", "finance", "operations"])
+const normalizeRole = (role) => String(role || "").trim().toLowerCase().replace(/-/g, "_").replace(/\s+/g, "_");
+const normalizeApproverRole = (role) => {
+    const normalized = normalizeRole(role).replace(/^salesmanager$/, "sales_manager");
+    if (normalized === "sales_manager") return "Sales Manager";
+    if (normalized === "finance") return "Finance";
+    if (normalized === "operations") return "Operations";
+    return String(role || "").trim();
 };
-const normalizeRole = (role) => String(role || "").toLowerCase().replace(/-/g, "_");
-const allowedRoles = (role) => roleAliases[normalizeRole(role)] || new Set([normalizeRole(role)]);
+const allowedRoles = (role) => {
+    const normalized = normalizeRole(role).replace(/^salesmanager$/, "sales_manager");
+    if (normalized === "sales_manager") return new Set(["sales_manager"]);
+    if (normalized === "finance") return new Set(["finance"]);
+    return new Set();
+};
+
+const createApprovalError = (message, statusCode = 400) => {
+    const error = new Error(message);
+    error.statusCode = statusCode;
+    return error;
+};
 
 const getUser = async (client, userId) => {
     const result = await client.query(
         `SELECT COALESCE(NULLIF(CONCAT(first_name, ' ', last_name), ' '), username) AS name, role FROM users WHERE id = $1 AND is_active = TRUE`,
         [userId]
     );
-    if (!result.rows[0]) throw new Error("Authenticated user not found or inactive");
+    if (!result.rows[0]) throw createApprovalError("Authenticated user not found or inactive", 401);
     return result.rows[0];
 };
 
@@ -43,20 +53,38 @@ const loadChains = async (client) => {
              FROM approval_chain_steps WHERE approval_chain_id = $1 ORDER BY step_order`,
             [chain.id]
         );
-        chain.steps = steps.rows;
+        chain.steps = steps.rows.map((step) => ({ ...step, approverRole: normalizeApproverRole(step.approverRole) }));
     }
     return result.rows;
 };
 
 const resolveApprovalChain = async (client, calculation) => {
     if (calculation.blendedRisk === "LOW") return null;
-    const chain = (await loadChains(client)).find((candidate) => {
-        const riskMatches = !candidate.minRisk || candidate.minRisk === calculation.blendedRisk;
-        const minMatches = Number(candidate.minDiscountPercent || 0) <= Number(calculation.maxSingleViolation || 0);
-        const maxMatches = candidate.maxDiscountPercent === null || Number(calculation.maxSingleViolation || 0) <= Number(candidate.maxDiscountPercent);
+    const discountGovernanceScore = Math.max(
+        Number(calculation.maxSingleViolation || 0),
+        Number(calculation.totalViolationPoints || 0)
+    );
+    const matchingChains = (await loadChains(client)).filter((candidate) => {
+        const riskMatches = !candidate.minRisk || String(candidate.minRisk).toUpperCase() === calculation.blendedRisk;
+        const minMatches = Number(candidate.minDiscountPercent || 0) <= discountGovernanceScore;
+        const maxMatches = candidate.maxDiscountPercent === null || discountGovernanceScore <= Number(candidate.maxDiscountPercent);
         return riskMatches && minMatches && maxMatches && candidate.steps.length > 0;
     });
-    if (!chain) throw new Error(`No active approval chain configured for ${calculation.blendedRisk} risk`);
+
+    // Prefer exact risk, then the highest applicable minimum threshold, then the
+    // most specific maximum boundary, with deterministic id/name tie breakers.
+    const chain = matchingChains.sort((left, right) => {
+        const leftExactRisk = String(left.minRisk || "").toUpperCase() === calculation.blendedRisk ? 1 : 0;
+        const rightExactRisk = String(right.minRisk || "").toUpperCase() === calculation.blendedRisk ? 1 : 0;
+        if (rightExactRisk !== leftExactRisk) return rightExactRisk - leftExactRisk;
+        const minDifference = Number(right.minDiscountPercent || 0) - Number(left.minDiscountPercent || 0);
+        if (minDifference !== 0) return minDifference;
+        const leftMax = left.maxDiscountPercent === null ? Number.POSITIVE_INFINITY : Number(left.maxDiscountPercent);
+        const rightMax = right.maxDiscountPercent === null ? Number.POSITIVE_INFINITY : Number(right.maxDiscountPercent);
+        if (leftMax !== rightMax) return leftMax - rightMax;
+        return Number(left.id) - Number(right.id) || String(left.name).localeCompare(String(right.name));
+    })[0];
+    if (!chain) throw createApprovalError(`No active approval chain configured for ${calculation.blendedRisk} risk`, 400);
     return chain;
 };
 
@@ -100,7 +128,7 @@ const lockQuotation = async (client, codeOrId) => {
 
 export const getApproval = async (codeOrId) => {
     const quote = await getQuotationByCodeOrId(codeOrId);
-    if (!quote) throw new Error("Quotation not found");
+    if (!quote) throw createApprovalError("Quotation not found", 404);
     const requestResult = await pool.query(
         `SELECT id, status, approval_chain_id AS "approvalChainId", submitted_by AS "submittedBy", created_at AS "createdAt", updated_at AS "updatedAt"
          FROM quotation_approval_requests WHERE quotation_id = $1 ORDER BY id DESC LIMIT 1`,
@@ -110,24 +138,34 @@ export const getApproval = async (codeOrId) => {
     let steps = [];
     if (request) {
         const stepResult = await pool.query(
-            `SELECT s.id, s.step_order AS "stepOrder", s.approver_role AS role, s.status,
+            `SELECT s.id, s.step_order AS "stepOrder", s.approver_role AS role, s.approver_role AS "approverRole", s.status,
                     s.approver_id AS "approverId", u.username AS approver,
                     s.acted_at AS "approvedAt", s.comment
              FROM quotation_approval_steps s LEFT JOIN users u ON u.id = s.approver_id
              WHERE s.approval_request_id = $1 ORDER BY s.step_order`,
             [request.id]
         );
-        steps = stepResult.rows;
+        steps = stepResult.rows.map((step) => ({
+            ...step,
+            role: normalizeApproverRole(step.role),
+            approverRole: normalizeApproverRole(step.approverRole)
+        }));
     }
+    const currentStep = steps.find((step) => step.status === "PENDING") || null;
     return {
         quotationId: quote.quoteCode,
         userId: quote.userId,
+        customerName: quote.customerName,
+        customerTier: quote.customerTier,
+        blendedRisk: quote.blendedRisk,
         status: quote.status,
+        approvalStage: quote.approvalStage,
         riskStatus: quote.blendedRisk,
         blendedRiskScore: quote.blendedRisk,
-        currentStep: steps.find((step) => step.status === "PENDING") || null,
+        currentStep,
         request,
         steps,
+        workflow: steps,
         auditTrail: quote.auditTrail
     };
 };
@@ -220,13 +258,13 @@ export const submitQuotation = async (codeOrId, userId) => {
         await client.query("BEGIN");
         const user = await getUser(client, userId);
         const quote = await lockQuotation(client, codeOrId);
-        if (!quote) throw new Error("Quotation not found");
+        if (!quote) throw createApprovalError("Quotation not found", 404);
         if (Number(quote.user_id) !== Number(userId)) {
             const error = new Error("Only the quotation creator can submit it");
             error.statusCode = 403;
             throw error;
         }
-        if (!["Draft", "Returned", "Under Negotiation"].includes(quote.status)) throw new Error("Quotation is not in a submittable state");
+        if (!["Draft", "Returned", "Under Negotiation"].includes(quote.status)) throw createApprovalError("Quotation is not in a submittable state", 400);
         const itemResult = await client.query(`SELECT product_id AS "productId", product_variant_id AS "productVariantId", quantity, discount_percent AS "discountPercent" FROM quotation_items WHERE quotation_id = $1 ORDER BY id`, [quote.id]);
         const calculation = await calculateQuotation({ client, customerId: quote.customer_id, priceListId: quote.price_list_id, items: itemResult.rows });
         const chain = await resolveApprovalChain(client, calculation);
@@ -252,14 +290,14 @@ const performAction = async (codeOrId, userId, action, comment) => {
         await client.query("BEGIN");
         const user = await getUser(client, userId);
         const quote = await lockQuotation(client, codeOrId);
-        if (!quote) throw new Error("Quotation not found");
-        if (quote.status !== "Pending Approval") throw new Error("Quotation is not awaiting approval");
-        if (Number(quote.user_id) === Number(userId)) throw new Error("Quotation creator cannot approve their own quotation");
-        const stepResult = await client.query(`SELECT s.* FROM quotation_approval_steps s JOIN quotation_approval_requests ar ON ar.id = s.approval_request_id WHERE ar.quotation_id = $1 AND ar.status = 'PENDING' AND s.status = 'PENDING' FOR UPDATE`, [quote.id]);
+        if (!quote) throw createApprovalError("Quotation not found", 404);
+        if (quote.status !== "Pending Approval") throw createApprovalError("Quotation is not awaiting approval", 400);
+        if (Number(quote.user_id) === Number(userId)) throw createApprovalError("Quotation creator cannot approve their own quotation", 403);
+        const stepResult = await client.query(`SELECT s.* FROM quotation_approval_steps s JOIN quotation_approval_requests ar ON ar.id = s.approval_request_id WHERE ar.quotation_id = $1 AND ar.status = 'PENDING' AND s.status = 'PENDING' ORDER BY s.step_order LIMIT 1 FOR UPDATE OF s, ar`, [quote.id]);
         const step = stepResult.rows[0];
-        if (!step) throw new Error("No pending approval step");
+        if (!step) throw createApprovalError("No pending approval step", 400);
         const userRole = normalizeRole(user.role);
-        if (!allowedRoles(step.approver_role).has(userRole)) throw new Error("User role is not authorized for this approval step");
+        if (!allowedRoles(step.approver_role).has(userRole)) throw createApprovalError("User role is not authorized for this approval step", 403);
         const stepStatus = action === "APPROVE" ? "APPROVED" : action === "REJECT" ? "REJECTED" : "RETURNED";
         await client.query(`UPDATE quotation_approval_steps SET status = $1, approver_id = $2, acted_at = CURRENT_TIMESTAMP, comment = $3 WHERE id = $4 AND status = 'PENDING'`, [stepStatus, userId, comment || null, step.id]);
         const next = action === "APPROVE" ? await client.query(`SELECT id, approver_role FROM quotation_approval_steps WHERE approval_request_id = $1 AND step_order > $2 AND status = 'WAITING' ORDER BY step_order LIMIT 1`, [step.approval_request_id, step.step_order]) : { rows: [] };

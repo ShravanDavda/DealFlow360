@@ -10,6 +10,11 @@ export const getProduct = async (productId) => {
   return response.data?.data || null;
 };
 
+export const getNextProductSku = async () => {
+  const response = await api.get('/products/next-sku');
+  return response.data?.data?.sku || '';
+};
+
 export const createProduct = async (product) => {
   const response = await api.post('/products', product);
   return response.data?.data || null;
@@ -38,6 +43,8 @@ export const toProductRow = (product) => ({
 
 export const toProductDetail = (product) => ({
   ...toProductRow(product),
+  cgstPercent: Number(product.cgstPercent ?? 0),
+  sgstPercent: Number(product.sgstPercent ?? 0),
   taxPercent: Number(product.taxPercent ?? 0),
   description: product.description || '',
   isSubscription: Boolean(product.isSubscription),

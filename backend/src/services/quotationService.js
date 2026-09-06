@@ -38,11 +38,7 @@ export const calculateBlendedRisk = (items = []) => {
         blendedRisk = "MEDIUM";
     }
 
-    if (blendedRisk === "HIGH") {
-        requiredApproval = "Sales Manager then Finance";
-    } else if (blendedRisk === "MEDIUM") {
-        requiredApproval = "Sales Manager";
-    }
+    if (blendedRisk !== "LOW") requiredApproval = "Configured approval chain required";
 
     return {
         blendedRisk,
@@ -185,7 +181,8 @@ export const getQuotationByCodeOrId = async (codeOrId) => {
             qi.discount_limit AS "discountLimit",
             qi.line_total AS "lineTotal",
             qi.margin_percent AS "marginPercent",
-            p.tax_percent AS "taxPercent",
+            COALESCE(NULLIF(qi.cgst_percent, 0), NULLIF(p.cgst_percent, 0), p.tax_percent / 2, 0) AS "cgstPercent",
+            COALESCE(NULLIF(qi.sgst_percent, 0), NULLIF(p.sgst_percent, 0), p.tax_percent / 2, 0) AS "sgstPercent",
             qi.risk_status AS "status",
             qi.is_recurring AS "isRecurring",
             qi.recurring_cycle AS "recurringCycle"
@@ -256,7 +253,9 @@ export const getQuotationByCodeOrId = async (codeOrId) => {
             discountLimit: Number(row.discountLimit),
             lineTotal: Number(row.lineTotal),
             marginPercent: Number(row.marginPercent),
-            taxPercent: Number(row.taxPercent || 0),
+            cgstPercent: Number(row.cgstPercent || 0),
+            sgstPercent: Number(row.sgstPercent || 0),
+            taxPercent: Number(row.cgstPercent || 0) + Number(row.sgstPercent || 0),
             status: row.status,
             isRecurring: row.isRecurring,
             recurringCycle: row.recurringCycle
@@ -310,9 +309,9 @@ export const createQuotation = async ({ customerId, userId, priceListId, items =
                 INSERT INTO quotation_items (
                     quotation_id, product_id, product_variant_id, item_name, category_name,
                     quantity, unit_price, base_cost, discount_percent, discount_limit,
-                    line_total, margin_percent, risk_status, is_recurring, recurring_cycle
+                    line_total, margin_percent, tax_percent, cgst_percent, sgst_percent, risk_status, is_recurring, recurring_cycle
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
                 `,
                 [
                     newQuote.id,
@@ -327,6 +326,9 @@ export const createQuotation = async ({ customerId, userId, priceListId, items =
                     item.discountLimit,
                     item.lineTotal,
                     item.marginPercent.toFixed(2),
+                    item.taxPercent,
+                    item.cgstPercent,
+                    item.sgstPercent,
                     item.riskStatus,
                     item.isRecurring,
                     item.recurringCycle || null
@@ -410,9 +412,9 @@ export const updateQuotation = async (idOrCode, { items = [], customerNotes, int
                 INSERT INTO quotation_items (
                     quotation_id, product_id, product_variant_id, item_name, category_name,
                     quantity, unit_price, base_cost, discount_percent, discount_limit,
-                    line_total, margin_percent, risk_status, is_recurring, recurring_cycle
+                    line_total, margin_percent, tax_percent, cgst_percent, sgst_percent, risk_status, is_recurring, recurring_cycle
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
                 `,
                 [
                     quote.dbId,
@@ -427,6 +429,9 @@ export const updateQuotation = async (idOrCode, { items = [], customerNotes, int
                     item.discountLimit,
                     item.lineTotal,
                     item.marginPercent.toFixed(2),
+                    item.taxPercent,
+                    item.cgstPercent,
+                    item.sgstPercent,
                     item.riskStatus,
                     item.isRecurring,
                     item.recurringCycle || null

@@ -17,6 +17,24 @@ const ensureAdminConfigurationSchema = async () => {
     ALTER TABLE quotation_audit_trail ADD COLUMN IF NOT EXISTS user_role VARCHAR(50);
     ALTER TABLE quotation_audit_trail ADD COLUMN IF NOT EXISTS previous_status VARCHAR(50);
     ALTER TABLE quotation_audit_trail ADD COLUMN IF NOT EXISTS new_status VARCHAR(50);
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS cgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS sgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
+    ALTER TABLE quotation_items ADD COLUMN IF NOT EXISTS cgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
+    ALTER TABLE quotation_items ADD COLUMN IF NOT EXISTS sgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
+    UPDATE products SET cgst_percent = tax_percent / 2, sgst_percent = tax_percent / 2 WHERE cgst_percent = 0 AND sgst_percent = 0 AND tax_percent <> 0;
+    UPDATE quotation_items SET cgst_percent = tax_percent / 2, sgst_percent = tax_percent / 2 WHERE cgst_percent = 0 AND sgst_percent = 0 AND tax_percent <> 0;
+    CREATE SEQUENCE IF NOT EXISTS product_sku_seq;
+    DO $$
+    DECLARE max_sku BIGINT; current_sku BIGINT;
+    BEGIN
+        SELECT MAX(CASE WHEN sku ~ '^[0-9]+$' THEN sku::BIGINT WHEN sku ~ '^PROD-[0-9]+$' THEN SUBSTRING(sku FROM 6)::BIGINT END) INTO max_sku FROM products;
+        SELECT last_value INTO current_sku FROM product_sku_seq;
+        IF max_sku IS NULL AND current_sku <= 1 THEN
+            PERFORM setval('product_sku_seq', 1, FALSE);
+        ELSIF max_sku IS NOT NULL AND current_sku < max_sku THEN
+            PERFORM setval('product_sku_seq', max_sku, TRUE);
+        END IF;
+    END $$;
 
         CREATE TABLE IF NOT EXISTS approval_chains (
             id SERIAL PRIMARY KEY,
@@ -92,6 +110,24 @@ const ensureAdminConfigurationSchema = async () => {
         CREATE INDEX IF NOT EXISTS idx_approval_steps_request_status ON quotation_approval_steps (approval_request_id, status);
         CREATE INDEX IF NOT EXISTS idx_approval_steps_role ON quotation_approval_steps (approver_role);
 
+                -- Migrate legacy approval configuration only; historical quotation steps remain immutable.
+                DELETE FROM approval_chain_steps legacy
+                USING approval_chain_steps finance_step
+                WHERE legacy.approval_chain_id = finance_step.approval_chain_id
+                    AND legacy.step_order = finance_step.step_order
+                    AND LOWER(legacy.approver_role) = 'operations'
+                    AND LOWER(finance_step.approver_role) = 'finance';
+                UPDATE approval_chain_steps legacy
+                SET approver_role = 'Finance'
+                WHERE LOWER(legacy.approver_role) = 'operations'
+                    AND legacy.step_order > 1
+                    AND EXISTS (
+                            SELECT 1 FROM approval_chain_steps manager_step
+                            WHERE manager_step.approval_chain_id = legacy.approval_chain_id
+                                AND manager_step.step_order = 1
+                                AND LOWER(manager_step.approver_role) = 'sales manager'
+                    );
+
         -- Product Pairings (Upsell & Cross-sell) Enhancements
         ALTER TABLE product_pairings ADD COLUMN IF NOT EXISTS relationship_type VARCHAR(20) NOT NULL DEFAULT 'CROSS_SELL';
         ALTER TABLE product_pairings DROP CONSTRAINT IF EXISTS product_pairings_relationship_type_check;
@@ -108,8 +144,8 @@ const ensureAdminConfigurationSchema = async () => {
             WHERE is_active = TRUE;
 
         -- Ensure sample product "Laptop Pro 16" exists if not already present
-        INSERT INTO products (category_id, sku, name, description, base_cost, unit, tax_percent, is_active)
-        SELECT 1, 'PROD-016', 'Laptop Pro 16', 'High-performance 16-inch workstation laptop', 1450.00, 'Each', 18.00, TRUE
+        INSERT INTO products (category_id, sku, name, description, base_cost, unit, tax_percent, cgst_percent, sgst_percent, is_active)
+        SELECT 1, 'PROD-016', 'Laptop Pro 16', 'High-performance 16-inch workstation laptop', 1450.00, 'Each', 18.00, 9.00, 9.00, TRUE
         WHERE NOT EXISTS (SELECT 1 FROM products WHERE name ILIKE '%Laptop Pro 16%' OR sku = 'PROD-016');
 
         -- Customer Role & Customer Account Linking
@@ -173,6 +209,8 @@ const ensureAdminConfigurationSchema = async () => {
             unit_price NUMERIC(12, 2) NOT NULL,
             discount_percent NUMERIC(5, 2) NOT NULL DEFAULT 0,
             tax_percent NUMERIC(5, 2) NOT NULL DEFAULT 0,
+            cgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0,
+            sgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0,
             discount_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
             tax_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
             line_total NUMERIC(12, 2) NOT NULL,
@@ -181,6 +219,8 @@ const ensureAdminConfigurationSchema = async () => {
             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
+        ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS cgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
+        ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS sgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
 
         ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS product_id INTEGER REFERENCES products(id) ON UPDATE CASCADE ON DELETE SET NULL;
 
@@ -201,6 +241,8 @@ const ensureAdminConfigurationSchema = async () => {
         );
         CREATE INDEX IF NOT EXISTS idx_backorder_records_order ON backorder_records(fulfillment_order_id);
         CREATE INDEX IF NOT EXISTS idx_backorder_records_quote ON backorder_records(quotation_id);
+        ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS cgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
+        ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS sgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
     `);
 };
 

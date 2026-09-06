@@ -181,7 +181,7 @@ export const getNegotiationHistory = async (quoteCodeOrId, customerId, userRole 
     const audit = await pool.query(
         `SELECT id, action, note, user_name AS "userName", user_role AS "userRole", created_at AS "createdAt"
          FROM quotation_audit_trail
-         WHERE quotation_id = $1 AND action IN ('Negotiation Request', 'Confirmed', 'APPROVAL_STEP_APPROVED', 'APPROVAL_STEP_REJECTED', 'APPROVAL_RETURNED', 'QUOTATION_APPROVED')
+         WHERE quotation_id = $1 AND action IN ('Negotiation Request', 'RE_APPROVAL_STARTED', 'Confirmed', 'APPROVAL_STEP_APPROVED', 'APPROVAL_STEP_REJECTED', 'APPROVAL_RETURNED', 'QUOTATION_APPROVED')
          ORDER BY created_at DESC`,
         [quote.dbId]
     );
@@ -283,6 +283,12 @@ export const submitCustomerNegotiation = async (
                 nextStatus = "Approved";
                 nextStage = "Auto-Approved";
                 reEnteredApproval = false;
+                await client.query(
+                    `UPDATE quotation_approval_requests
+                     SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP
+                     WHERE quotation_id = $1 AND status IN ('PENDING', 'RETURNED')`,
+                    [quote.dbId]
+                );
             }
         } else {
             nextStatus = "Under Negotiation";
@@ -379,6 +385,16 @@ export const submitCustomerNegotiation = async (
             `,
             [quote.dbId, auditNote, quote.status, nextStatus]
         );
+
+        if (reEnteredApproval) {
+            await client.query(
+                `
+                INSERT INTO quotation_audit_trail (quotation_id, user_name, user_role, action, note, previous_status, new_status)
+                VALUES ($1, 'Customer (Portal)', 'customer', 'RE_APPROVAL_STARTED', $2, $3, $4)
+                `,
+                [quote.dbId, `New approval cycle created for ${blendedRisk} risk`, quote.status, nextStatus]
+            );
+        }
 
         await client.query("COMMIT");
 

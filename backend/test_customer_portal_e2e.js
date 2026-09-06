@@ -377,6 +377,22 @@ async function runTests() {
   }, mgrToken);
   assert(round2Approve.ok, "Round 2: Manager approves 22% discount");
 
+  const round2Pending = await pool.query(
+    `SELECT approver_role FROM quotation_approval_steps s
+     JOIN quotation_approval_requests ar ON s.approval_request_id = ar.id
+     WHERE ar.quotation_id = $1 AND ar.status = 'PENDING' AND s.status = 'PENDING'`,
+    [qRoundDbId]
+  );
+  if (round2Pending.rows[0]?.approver_role?.toLowerCase().includes("finance")) {
+    const financeLogin = await post("/auth/login", { email: "finance@dealflow360.com", password: "password123" });
+    const financeToken = financeLogin.data?.data?.token;
+    const round2FinanceApprove = await post(`/approvals/A-${qRoundDbId}/approve`, {
+      decision: "APPROVED",
+      comment: "Finance approves Round 2 (22%)",
+    }, financeToken);
+    assert(round2FinanceApprove.ok, "Round 2: Finance approves 22% discount");
+  }
+
   const qRoundFinal = await pool.query("SELECT status FROM quotations WHERE id = $1", [qRoundDbId]);
   assert(qRoundFinal.rows[0].status === "Approved", "Round 2: Quotation status is now 'Approved'");
 

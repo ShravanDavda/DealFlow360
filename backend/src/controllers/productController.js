@@ -3,8 +3,13 @@ import {
     getProductById,
     createProduct,
     updateProduct,
-    deactivateProduct
+    deactivateProduct,
+    getNextProductSku
 } from "../services/productService.js";
+
+const getNextSku = async (req, res, next) => {
+    try { res.status(200).json({ success: true, data: { sku: await getNextProductSku() } }); } catch (error) { next(error); }
+};
 
 const getProducts = async (req, res) => {
     try {
@@ -69,22 +74,21 @@ const createNewProduct = async (
         const {
             categoryId,
             name,
-            sku,
             description,
             baseCost,
             unit,
-            taxPercent
+            cgstPercent,
+            sgstPercent
         } = req.body;
 
         if (
             !categoryId ||
-            !name ||
-            !sku
+            !name
         ) {
             return res.status(400).json({
                 success: false,
                 message:
-                    "Category, product name and SKU are required"
+                    "Category and product name are required"
             });
         }
 
@@ -92,11 +96,11 @@ const createNewProduct = async (
             await createProduct({
                 categoryId,
                 name,
-                sku,
                 description,
                 baseCost,
                 unit,
-                taxPercent
+                cgstPercent,
+                sgstPercent
             });
 
         res.status(201).json({
@@ -178,6 +182,7 @@ const deactivateExistingProduct =
 export {
     getProducts,
     getProduct,
+    getNextSku,
     createNewProduct,
     updateExistingProduct,
     deactivateExistingProduct

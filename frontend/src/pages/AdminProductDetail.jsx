@@ -54,7 +54,8 @@ export const AdminProductDetail = () => {
         categoryId: productData.category_id || '',
         baseCost: productData.base_cost ?? '',
         unit: productData.unit || 'Each',
-        taxPercent: productData.taxPercent ?? productData.tax_percent ?? 0,
+        cgstPercent: productData.cgstPercent ?? 0,
+        sgstPercent: productData.sgstPercent ?? 0,
         description: productData.description || '',
       });
     } catch (error) {
@@ -71,8 +72,8 @@ export const AdminProductDetail = () => {
 
   const handleSaveProduct = async (event) => {
     event.preventDefault();
-    if (!form.name.trim() || !form.sku.trim() || !form.categoryId || form.baseCost === '') {
-      setFeedback({ type: 'error', message: 'Name, SKU, category, and base price are required.' });
+    if (!form.name.trim() || !form.categoryId || form.baseCost === '') {
+      setFeedback({ type: 'error', message: 'Name, category, and base price are required.' });
       return;
     }
     setIsSaving(true);
@@ -80,11 +81,11 @@ export const AdminProductDetail = () => {
       await updateProduct(productId, {
         categoryId: Number(form.categoryId),
         name: form.name.trim(),
-        sku: form.sku.trim(),
         description: form.description.trim(),
         baseCost: Number(form.baseCost),
         unit: form.unit.trim() || 'Each',
-        taxPercent: Number(form.taxPercent || 0),
+        cgstPercent: Number(form.cgstPercent || 0),
+        sgstPercent: Number(form.sgstPercent || 0),
       });
       setFeedback({ type: 'success', message: 'Product updated successfully.' });
       navigate(`/admin/products/${productId}`, { replace: true });
@@ -152,15 +153,16 @@ export const AdminProductDetail = () => {
 
         {isEditing ? <form onSubmit={handleSaveProduct} className="grid grid-cols-1 gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-2">
           <label className="text-sm font-medium text-slate-700">Product Name<input name="name" value={form.name} onChange={handleProductChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
-          <label className="text-sm font-medium text-slate-700">SKU<input name="sku" value={form.sku} onChange={handleProductChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
+          <label className="text-sm font-medium text-slate-700">SKU<input readOnly name="sku" value={form.sku} className="mt-1 block w-full rounded-md border border-slate-300 bg-slate-100 px-3 py-2 font-normal text-slate-600" /></label>
           <label className="text-sm font-medium text-slate-700">Category<select name="categoryId" value={form.categoryId} onChange={handleProductChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal"><option value="">Select category</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           <label className="text-sm font-medium text-slate-700">Base Price<input name="baseCost" type="number" min="0" step="0.01" value={form.baseCost} onChange={handleProductChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
           <label className="text-sm font-medium text-slate-700">Unit<input name="unit" value={form.unit} onChange={handleProductChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
-          <label className="text-sm font-medium text-slate-700">Tax %<input name="taxPercent" type="number" min="0" step="0.01" value={form.taxPercent} onChange={handleProductChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
+          <label className="text-sm font-medium text-slate-700">CGST %<input name="cgstPercent" type="number" min="0" max="100" step="0.01" value={form.cgstPercent} onChange={handleProductChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
+          <label className="text-sm font-medium text-slate-700">SGST %<input name="sgstPercent" type="number" min="0" max="100" step="0.01" value={form.sgstPercent} onChange={handleProductChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
           <label className="text-sm font-medium text-slate-700 sm:col-span-2">Description<textarea name="description" rows="3" value={form.description} onChange={handleProductChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
           <div className="flex justify-end gap-3 sm:col-span-2"><Button type="button" variant="outline" onClick={() => navigate(`/admin/products/${productId}`)}>Cancel</Button><Button type="submit" disabled={isSaving}><Save className="h-4 w-4" />{isSaving ? 'Saving...' : 'Save product'}</Button></div>
         </form> : <section className="grid grid-cols-1 gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-2">
-          {[['Category', product.category_name || product.category], ['Base price', Number(product.base_cost || 0).toLocaleString()], ['Unit', product.unit || 'Each'], ['Tax', `${product.taxPercent ?? product.tax_percent ?? 0}%`], ['SKU', product.sku], ['Description', product.description || '-']].map(([label, value]) => <div key={label}><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 text-sm text-slate-900">{value}</p></div>)}
+          {[['Category', product.category_name || product.category], ['Base price', Number(product.base_cost || 0).toLocaleString()], ['Unit', product.unit || 'Each'], ['CGST', `${product.cgstPercent ?? 0}%`], ['SGST', `${product.sgstPercent ?? 0}%`], ['SKU', product.sku], ['Description', product.description || '-']].map(([label, value]) => <div key={label}><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 text-sm text-slate-900">{value}</p></div>)}
         </section>}
 
         <section className="rounded-lg border border-slate-200 bg-white shadow-sm">

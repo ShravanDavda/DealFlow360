@@ -3,16 +3,17 @@ import { Edit3, Eye, Layers, PackagePlus, Search, Trash2, X } from 'lucide-react
 import { useNavigate } from 'react-router-dom';
 import { DashboardNavbar } from '../components/dashboard/DashboardNavbar';
 import { Button } from '../components/ui/Button';
-import { createProduct, deactivateProduct, getProducts } from '../services/productService';
+import { createProduct, deactivateProduct, getNextProductSku, getProducts } from '../services/productService';
 import { getCategories } from '../services/categoryService';
 
-const EMPTY_FORM = { name: '', sku: '', categoryId: '', baseCost: '', unit: 'Each', taxPercent: '', description: '' };
+const EMPTY_FORM = { name: '', sku: '', categoryId: '', baseCost: '', unit: 'Each', cgstPercent: '', sgstPercent: '', description: '' };
 
 const normalizeProduct = (product) => ({
   ...product,
   category: product.category || product.category_name || 'Uncategorized',
   price: Number(product.base_cost ?? product.price ?? 0),
-  taxPercent: Number(product.taxPercent ?? product.tax_percent ?? 0),
+  cgstPercent: Number(product.cgstPercent ?? 0),
+  sgstPercent: Number(product.sgstPercent ?? 0),
   variantCount: product.variants && product.variants !== '-' ? product.variants : '0',
 });
 
@@ -52,11 +53,15 @@ export const AdminProducts = () => {
   }), [products, search, categoryFilter, statusFilter]);
 
   const handleChange = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const openCreateForm = async () => {
+    setIsFormOpen(true);
+    try { setForm({ ...EMPTY_FORM, sku: await getNextProductSku() }); } catch (error) { setFeedback({ type: 'error', message: error.message || 'Unable to preview next SKU.' }); }
+  };
 
   const handleCreate = async (event) => {
     event.preventDefault();
-    if (!form.name.trim() || !form.sku.trim() || !form.categoryId || form.baseCost === '') {
-      setFeedback({ type: 'error', message: 'Name, SKU, category, and base price are required.' });
+    if (!form.name.trim() || !form.categoryId || form.baseCost === '') {
+      setFeedback({ type: 'error', message: 'Name, category, and base price are required.' });
       return;
     }
     setIsSaving(true);
@@ -64,11 +69,11 @@ export const AdminProducts = () => {
       const product = await createProduct({
         categoryId: Number(form.categoryId),
         name: form.name.trim(),
-        sku: form.sku.trim(),
         description: form.description.trim(),
         baseCost: Number(form.baseCost),
         unit: form.unit.trim() || 'Each',
-        taxPercent: Number(form.taxPercent || 0),
+        cgstPercent: Number(form.cgstPercent || 0),
+        sgstPercent: Number(form.sgstPercent || 0),
       });
       setIsFormOpen(false);
       setForm(EMPTY_FORM);
@@ -106,7 +111,7 @@ export const AdminProducts = () => {
               <Layers className="h-4 w-4 text-indigo-600" />
               <span>Upsell & Cross-sell</span>
             </Button>
-            <Button type="button" onClick={() => setIsFormOpen(true)} className="sm:!w-auto px-4 gap-2">
+            <Button type="button" onClick={openCreateForm} className="sm:!w-auto px-4 gap-2">
               <PackagePlus className="h-4 w-4" />
               <span>Add Product</span>
             </Button>
@@ -151,7 +156,7 @@ export const AdminProducts = () => {
                     <td className="px-4 py-4 text-slate-700">{product.category}</td>
                     <td className="px-4 py-4 font-medium text-slate-900">{Number(product.price).toLocaleString()}</td>
                     <td className="px-4 py-4 text-slate-700">{product.unit || 'Each'}</td>
-                    <td className="px-4 py-4 text-slate-700">{product.taxPercent}%</td>
+                    <td className="px-4 py-4 text-slate-700">CGST {product.cgstPercent}% / SGST {product.sgstPercent}%</td>
                     <td className="max-w-xs px-4 py-4 text-slate-600">{product.description || '-'}</td>
                     <td className="px-4 py-4 text-slate-700">{product.variantCount}</td>
                     <td className="px-4 py-4"><span className={`rounded-full border px-2 py-1 text-xs font-semibold ${product.is_active === false ? 'border-slate-200 bg-slate-100 text-slate-600' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>{product.is_active === false ? 'Archived' : 'Active'}</span></td>
@@ -173,11 +178,12 @@ export const AdminProducts = () => {
           <div className="flex items-center justify-between"><h2 id="add-product-title" className="text-lg font-semibold text-slate-900">Add Product</h2><button type="button" onClick={() => setIsFormOpen(false)} className="rounded-md p-2 text-slate-500 hover:bg-slate-100" aria-label="Close"><X className="h-5 w-5" /></button></div>
           <form onSubmit={handleCreate} className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="text-sm font-medium text-slate-700">Product Name<input name="name" value={form.name} onChange={handleChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
-            <label className="text-sm font-medium text-slate-700">SKU<input name="sku" value={form.sku} onChange={handleChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
+            <label className="text-sm font-medium text-slate-700">SKU<input readOnly name="sku" value={form.sku || 'Loading...'} className="mt-1 block w-full rounded-md border border-slate-300 bg-slate-100 px-3 py-2 font-normal text-slate-600" /></label>
             <label className="text-sm font-medium text-slate-700">Category<select name="categoryId" value={form.categoryId} onChange={handleChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal"><option value="">Select category</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
             <label className="text-sm font-medium text-slate-700">Base Price<input name="baseCost" type="number" min="0" step="0.01" value={form.baseCost} onChange={handleChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
             <label className="text-sm font-medium text-slate-700">Unit<input name="unit" value={form.unit} onChange={handleChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
-            <label className="text-sm font-medium text-slate-700">Tax %<input name="taxPercent" type="number" min="0" step="0.01" value={form.taxPercent} onChange={handleChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
+            <label className="text-sm font-medium text-slate-700">CGST %<input name="cgstPercent" type="number" min="0" max="100" step="0.01" value={form.cgstPercent} onChange={handleChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
+            <label className="text-sm font-medium text-slate-700">SGST %<input name="sgstPercent" type="number" min="0" max="100" step="0.01" value={form.sgstPercent} onChange={handleChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
             <label className="text-sm font-medium text-slate-700 sm:col-span-2">Description<textarea name="description" rows="3" value={form.description} onChange={handleChange} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /></label>
             <div className="flex justify-end gap-3 sm:col-span-2"><Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Cancel</Button><Button type="submit" disabled={isSaving}>{isSaving ? 'Saving...' : 'Create product'}</Button></div>
           </form>

@@ -6,7 +6,7 @@ export const getApprovals = async (req, res, next) => {
     try {
         const { role, status } = req.query;
         const ownerId = req.user.role === "sales_rep" ? req.user.userId : undefined;
-        const approvalRole = req.user.role === "sales_manager" ? "Sales Manager" : ["finance", "operations"].includes(req.user.role) ? "Finance" : role;
+        const approvalRole = req.user.role === "sales_manager" ? "Sales Manager" : req.user.role === "finance" ? "Finance" : req.user.role === "operations" ? "Operations" : role;
         const ownerRole = req.user.role === "sales_manager" ? "sales_rep" : undefined;
         const result = await approvalService.getApprovals({ role: approvalRole, status, ownerId, ownerRole });
         res.status(200).json({

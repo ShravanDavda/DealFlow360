@@ -3,6 +3,7 @@ import express from "express";
 import {
     getProducts,
     getProduct,
+    getNextSku,
     createNewProduct,
     updateExistingProduct,
     deactivateExistingProduct
@@ -15,6 +16,7 @@ import { getRecommendationsForProduct } from "../controllers/productPairingContr
 const router = express.Router();
 
 router.get("/", getProducts);
+router.get("/next-sku", authenticateToken, requireAdmin, getNextSku);
 router.get("/:id/recommendations", getRecommendationsForProduct);
 router.get("/:id", getProduct);
 

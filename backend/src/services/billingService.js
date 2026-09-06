@@ -20,13 +20,15 @@ const ensureInvoiceItems = async (client, invoiceCode, items) => {
 
     const supported = [
         "invoice_id", "quotation_item_id", "product_id", "item_name", "description", "quantity", "unit_price",
-        "discount_percent", "tax_percent", "discount_amount", "tax_amount", "line_total", "amount", "total"
+        "discount_percent", "tax_percent", "cgst_percent", "sgst_percent", "discount_amount", "tax_amount", "line_total", "amount", "total"
     ].filter((column) => availableColumns.has(column));
     if (!supported.includes("invoice_id") || !supported.includes("quantity")) return;
 
     for (const item of items) {
         const netBase = Number(item.unitPrice || 0) * Number(item.quantity || 0) * (1 - Number(item.discountPercent || 0) / 100);
-        const taxVal = netBase * (Number(item.taxPercent || 0) / 100);
+        const cgstVal = netBase * (Number(item.cgstPercent || 0) / 100);
+        const sgstVal = netBase * (Number(item.sgstPercent || 0) / 100);
+        const taxVal = cgstVal + sgstVal;
         const values = {
             invoice_id: invoiceId,
             quotation_item_id: item.id,
@@ -37,6 +39,8 @@ const ensureInvoiceItems = async (client, invoiceCode, items) => {
             unit_price: item.unitPrice,
             discount_percent: item.discountPercent,
             tax_percent: item.taxPercent,
+            cgst_percent: item.cgstPercent,
+            sgst_percent: item.sgstPercent,
             discount_amount: Number(item.unitPrice || 0) * Number(item.quantity || 0) * Number(item.discountPercent || 0) / 100,
             tax_amount: Number(taxVal.toFixed(2)),
             line_total: item.lineTotal,
@@ -54,7 +58,10 @@ const ensureInvoiceItems = async (client, invoiceCode, items) => {
 const generateBillingForQuotation = async (client, quote) => {
     const itemsResult = await client.query(
         `SELECT qi.id, qi.product_id AS "productId", qi.item_name AS "itemName", qi.quantity, qi.unit_price AS "unitPrice", qi.discount_percent AS "discountPercent",
-            COALESCE(NULLIF(qi.tax_percent, 0), p.tax_percent, 0) AS "taxPercent", qi.line_total AS "lineTotal", qi.is_recurring AS "isRecurring", qi.recurring_cycle AS "recurringCycle"
+            COALESCE(NULLIF(qi.cgst_percent, 0), NULLIF(p.cgst_percent, 0), p.tax_percent / 2, 0) AS "cgstPercent",
+            COALESCE(NULLIF(qi.sgst_percent, 0), NULLIF(p.sgst_percent, 0), p.tax_percent / 2, 0) AS "sgstPercent",
+            COALESCE(NULLIF(qi.cgst_percent, 0), NULLIF(p.cgst_percent, 0), p.tax_percent / 2, 0) + COALESCE(NULLIF(qi.sgst_percent, 0), NULLIF(p.sgst_percent, 0), p.tax_percent / 2, 0) AS "taxPercent",
+            qi.line_total AS "lineTotal", qi.is_recurring AS "isRecurring", qi.recurring_cycle AS "recurringCycle"
          FROM quotation_items qi
          LEFT JOIN products p ON p.id = qi.product_id
          WHERE qi.quotation_id = $1 ORDER BY qi.id`,

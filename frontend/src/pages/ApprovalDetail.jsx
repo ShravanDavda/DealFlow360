@@ -45,12 +45,11 @@ export const ApprovalDetail = () => {
 
   const currentStep = String(approval?.approval?.steps?.find((step) => step.status === 'PENDING')?.approverRole || approval?.currentStep || approval?.approvalStage || '').toLowerCase().replace(/_/g, ' ');
   const isPending = approval?.status === 'Pending' || approval?.status === 'Pending Approval';
-  const isAdmin = userRole === 'admin';
-  const isManagerStep = currentStep === 'sales manager' || !currentStep;
-  const isFinanceStep = currentStep === 'finance' || !currentStep;
+  const isManagerStep = currentStep === 'sales manager';
+  const isFinanceStep = currentStep === 'finance' || currentStep === 'operations';
   const canAct = isPending && (
-    ((userRole === 'sales_manager' || isAdmin) && isManagerStep) ||
-    ((['finance', 'operations'].includes(userRole) || isAdmin) && isFinanceStep)
+    (userRole === 'sales_manager' && isManagerStep) ||
+    (['finance', 'operations'].includes(userRole) && isFinanceStep)
   );
 
   const handleApprove = async () => {

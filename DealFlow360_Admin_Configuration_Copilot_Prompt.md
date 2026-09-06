@@ -1,594 +1,781 @@
-You are working on the existing DealFlow360 project.
-
-TASK:
-Fix the UPSSELL / CROSS-SELL responsibility and quotation workflow inconsistency.
+We need to modify the EXISTING DealFlow360 Admin → Products → Add Product functionality.
 
 IMPORTANT:
-Do NOT redesign the application.
-Do NOT create a new upsell/cross-sell system.
-Do NOT modify the database schema unless absolutely necessary.
-Do NOT add hardcoded/mock business data.
-Do NOT change authentication architecture.
-Do NOT give Admin unnecessary quotation-editing permissions.
-
-The intended responsibility model is:
-
-ADMIN
-→ configures product pairing/recommendation rules
-
-SALES REPRESENTATIVE
-→ uses those recommendations while creating/editing a quotation
-
-SALES MANAGER
-→ reviews/approves quotations
-
-FINANCE / OPERATIONS
-→ handles fulfillment and billing
-
-CUSTOMER
-→ negotiates/confirms quotation
+- Do NOT redesign the frontend.
+- Do NOT replace the existing Products page.
+- Do NOT create a new product management system.
+- Preserve the existing UI structure and styling.
+- Make only the changes required below.
+- Follow the existing Node.js + Express + PostgreSQL + React architecture.
+- Backend must be the source of truth for SKU generation.
+- Do not generate SKUs using frontend JavaScript.
+- Do not break existing quotations, pricing, billing, invoices, fulfillment, or product APIs.
 
 ==================================================
-1. FIRST INSPECT THE EXISTING IMPLEMENTATION
+1. AUTO-GENERATED SEQUENTIAL SKU
 ==================================================
 
-Inspect the current implementation of:
+Currently the Add Product modal contains:
 
-- QuotationDetail.jsx
-- QuotationBoard / quotation pages
-- UpsellSuggestions component
-- AdminProductPairings.jsx
-- productPairingService.js
-- productPairingController.js
-- productPairingRoutes.js
-- quotation service/controller/routes
-- authentication/RBAC
-- RoleGuard
-- current user/role handling
+- Product Name
+- SKU
+- Category
+- Base Price
+- Unit
+- Tax %
+- Description
 
-Trace exactly how:
+Change SKU behavior completely.
 
-- product pairings are configured
-- recommendations are fetched
-- recommendations are displayed
-- clicking + adds a product
-- quotation changes are saved
-- quotation submission works
-- quotation ownership/creator checks work
-
-Do not assume the current implementation is correct.
-
-==================================================
-2. CORRECT BUSINESS RESPONSIBILITY
-==================================================
-
-Implement/maintain this responsibility model:
-
-ADMIN:
-
-Can:
-- create product pairings
-- edit product pairings
-- activate/deactivate product pairings
-- configure upsell relationships
-- configure cross-sell relationships
-
-Admin should NOT:
-- edit another user's quotation
-- add products to another user's quotation
-- change quotation quantities
-- change quotation discounts
-- submit another user's quotation
-- approve another user's quotation unless the existing Manager role explicitly provides that permission
-
-SALES REPRESENTATIVE:
-
-Can, according to existing permissions:
-- create quotation
-- edit own quotation
-- add products
-- use upsell recommendations
-- use cross-sell recommendations
-- adjust quantity
-- apply allowed discount
-- save quotation
-- submit quotation for approval
-
-SALES MANAGER:
-
-Can:
-- review quotations requiring approval
-- approve
-- reject
-- return according to existing workflow
-
-FINANCE / OPERATIONS:
-
-Can:
-- perform permitted fulfillment
-- warehouse allocation
-- backorder processing
-- billing/invoice operations
-
-CUSTOMER:
-
-Can:
-- view own quotations
-- negotiate
-- submit counter-offers/questions
-- confirm own quotation
-
-==================================================
-3. FIX ADMIN QUOTATION DETAIL UI
-==================================================
-
-Current problem:
-
-When Admin opens a quotation created by a Sales Representative, the quotation detail page shows:
-
-"Upsell and Cross-Sell Suggestions"
-
-with clickable + buttons.
-
-But the page correctly says:
-
-"Read-only view. Only the quotation creator can edit or submit this quotation."
-
-This is inconsistent.
-
-Fix this.
-
-For a user who is NOT the quotation creator and does NOT have quotation-editing permission:
-
-- quotation remains read-only
-- recommendation cards must NOT have active add buttons
-- do NOT allow the Admin to add recommendations to the quotation
-- do NOT allow local state changes that imply the quotation was modified
-- do NOT show Save Draft
-- do NOT show Submit for Approval
-
-Instead, either:
-
-A. Hide the interactive recommendation section completely,
-
-OR preferably:
-
-B. Show recommendations as READ-ONLY information without + buttons, with a small explanatory message such as:
-
-"Upsell and cross-sell recommendations are configured by Admin and applied by the Sales Representative while editing a quotation."
-
-Use the existing UI design language.
-
-Do not redesign the page.
-
-==================================================
-4. SALES REP QUOTATION FLOW
-==================================================
-
-For the quotation creator / authorized Sales Representative, recommendations should remain interactive.
+SKU must be generated by the BACKEND/DATABASE sequentially.
 
 Example:
 
-Existing quotation:
+Existing products:
 
-Laptop Pro 14 × 1
+SKU 108
+SKU 109
+SKU 110
 
-Recommendations:
+Next created product:
 
-+ Docking Station
-+ Wireless Mouse
-+ Care Plan 2yr
+SKU 111
 
-When Sales Rep clicks:
+Next:
 
-+ Docking Station
+SKU 112
 
-the product should be added to the quotation's working state.
+etc.
 
-Then:
+The frontend must never calculate:
 
-quantity/price/discount/margin/risk
-must be recalculated using existing quotation logic.
+lastSKU + 1
 
-The recommendation itself is NOT a separate approval request.
+The backend/database must be authoritative.
 
-The correct workflow is:
+==================================================
+2. DATABASE SKU GENERATION
+==================================================
 
-Recommendation
+Inspect the existing products table and determine the current SKU datatype and constraints.
+
+Implement a PostgreSQL-safe sequential SKU mechanism.
+
+Preferred approach:
+
+Create a PostgreSQL sequence dedicated to product SKUs.
+
+Example concept:
+
+product_sku_seq
+
+The sequence must start from:
+
+MAX(existing numeric SKU) + 1
+
+Do NOT hardcode 111 or any other number.
+
+If existing data contains:
+
+110
+
+then the next generated SKU must be:
+
+111.
+
+If the database already has higher SKUs, continue from the highest existing SKU.
+
+The implementation must work with the existing seeded products.
+
+IMPORTANT:
+
+Do not reset the sequence every time the server starts.
+
+Do not calculate MAX(sku) + 1 during product creation because that can produce duplicate SKUs when two admins create products simultaneously.
+
+Use a database sequence or another concurrency-safe PostgreSQL mechanism.
+
+==================================================
+3. EXISTING DATA / MIGRATION
+==================================================
+
+Do not delete or modify existing legitimate product records.
+
+Create a safe migration/initialization mechanism that:
+
+1. Detects the current maximum numeric SKU.
+2. Creates the SKU sequence if it does not exist.
+3. Synchronizes the sequence to MAX(existing SKU).
+4. Ensures the next generated SKU is MAX + 1.
+
+The initialization must be idempotent.
+
+Running the backend multiple times must NOT recreate/reset the sequence incorrectly.
+
+If the project already has an appropriate schema initialization/migration mechanism, integrate with it instead of creating an unrelated system.
+
+==================================================
+4. BACKEND PRODUCT CREATION
+==================================================
+
+Find the existing product creation controller/service/repository.
+
+Modify product creation so that the backend generates the SKU.
+
+The client should NOT be trusted to provide the final SKU.
+
+When creating a product:
+
+BEGIN transaction if required
+    Generate SKU from PostgreSQL sequence
+    Insert product using generated SKU
+COMMIT
+
+Return the created product including its generated SKU.
+
+Example response:
+
+{
+  "id": 7,
+  "name": "Ergonomic Keyboard",
+  "sku": "111",
+  ...
+}
+
+If SKU is stored as an integer, preserve the existing datatype.
+
+If SKU is stored as text/varchar, generate the numeric value safely and convert it to the existing storage type.
+
+Do not unnecessarily change the public API response structure.
+
+==================================================
+5. OPTIONAL / PREVIEW NEXT SKU
+==================================================
+
+The Add Product modal currently displays an SKU field.
+
+The UI should show the next SKU fetched from the backend.
+
+Add/use a backend endpoint such as:
+
+GET /api/products/next-sku
+
+This endpoint should return the next available SKU for display purposes.
+
+Example:
+
+{
+  "sku": "111"
+}
+
+IMPORTANT:
+
+This endpoint is ONLY a preview.
+
+It must NOT reserve the SKU.
+
+The actual POST product creation must obtain the SKU atomically from the PostgreSQL sequence.
+
+Therefore:
+
+GET /next-sku
     ↓
-Sales Rep accepts
+UI displays 111
     ↓
-Product becomes quotation line
+Another admin may create a product
     ↓
-Quotation recalculates
+Actual POST /products
     ↓
-Sales Rep saves
+Backend obtains authoritative next sequence value
     ↓
-Sales Rep submits quotation
-    ↓
-Approval workflow if required
+Product receives the correct SKU
 
-Do NOT create a separate:
-
-"Submit Upsell Request"
-
-mechanism.
+If the existing architecture has a better way to expose this preview, use that instead.
 
 ==================================================
-5. SAVE / SUBMIT FLOW
+6. FRONTEND SKU FIELD
 ==================================================
 
-Verify that after accepting an upsell/cross-sell recommendation:
+Modify the existing Add Product modal.
 
-Sales Rep can:
+The SKU field should no longer be manually editable.
 
-1. Add recommended product.
-2. See it as a quotation line.
-3. See updated subtotal.
-4. See updated discount.
-5. See updated tax.
-6. See updated total.
-7. See updated margin.
-8. See updated risk.
-9. Save Draft.
-10. Submit for Approval.
+Change it to a read-only/display field.
 
-If the new product/discount causes an approval requirement, the normal quotation approval workflow must handle it.
+When the Add Product modal opens:
 
-Do not create a separate approval system for upsell/cross-sell.
+Call the backend next-SKU endpoint.
 
-==================================================
-6. DO NOT BYPASS BACKEND AUTHORIZATION
-==================================================
+Display:
 
-The frontend visibility check is NOT sufficient.
+SKU
+111
 
-Verify backend APIs also enforce:
+The field should visually communicate that it is system-generated.
 
-- Admin cannot modify another user's quotation.
-- Non-creators cannot save another user's quotation through direct API calls.
-- Non-creators cannot submit another user's quotation.
-- Customer cannot modify quotation lines directly.
-- Customer can only use the existing negotiation workflow.
-- Sales Rep can only modify quotations allowed by existing ownership/permission rules.
+Do NOT allow the user to type/change the SKU.
 
-If backend authorization is already correct, preserve it.
+If the preview request fails, display an appropriate non-blocking error/loading state.
 
-If there is a gap, fix only that gap.
+However, product creation must still rely on the backend-generated SKU.
 
-Never rely solely on hiding a button.
+Never trust the frontend preview value.
 
 ==================================================
-7. PRODUCT PAIRING ADMIN FLOW
+7. IMPORTANT SKU CONCURRENCY RULE
 ==================================================
 
-Ensure Admin's actual upsell/cross-sell responsibility remains functional.
+Test this scenario:
 
-Admin should be able to go to:
+Admin A opens Add Product:
+    preview = 111
 
-Configuration
-→ Product Pairings
+Admin B opens Add Product:
+    preview = 111
 
-and manage:
+Admin A creates product:
+    actual backend SKU = 111
 
-- source product
-- recommended product
-- relationship type
-- priority/ranking if supported
-- active/inactive state
-- other existing pairing fields
+Admin B creates product:
+    actual backend SKU = 112
 
-These configurations must be stored in PostgreSQL through the existing API.
+There must never be:
 
-Do NOT hardcode pairings.
+111
+111
 
-==================================================
-8. RECOMMENDATION DATA
-==================================================
+The database must guarantee uniqueness.
 
-Recommendations shown to Sales Rep must come from:
-
-PostgreSQL
-→ product_pairings
-→ backend API
-→ frontend
-
-Do not introduce:
-
-const recommendations = [...]
-or:
-
-MOCK_RECOMMENDATIONS
-
-or hardcoded product names.
-
-Use existing product pairing endpoints.
+Add/retain a UNIQUE constraint/index on products.sku if appropriate for the existing schema.
 
 ==================================================
-9. ADMIN QUOTATION VIEW
+8. REPLACE TAX % WITH CGST % AND SGST %
 ==================================================
 
-When Admin opens:
+The existing Add Product modal has:
 
-Quotation created by Sales Rep
+Tax %
 
-Admin should be able to REVIEW the quotation.
+Replace it with TWO fields:
 
-Admin should be able to see:
+CGST %
+SGST %
 
-- customer
-- products
-- quantities
-- pricing
+Example:
+
+CGST %    9
+SGST %    9
+
+Do not keep the old single Tax % input in the UI.
+
+==================================================
+9. PRODUCTS DATABASE
+==================================================
+
+Inspect the existing products table.
+
+Currently the project may use:
+
+tax_percent
+
+Replace or migrate this into:
+
+cgst_percent
+sgst_percent
+
+Use appropriate numeric/decimal PostgreSQL types.
+
+For example:
+
+NUMERIC(5,2)
+
+Do not blindly drop tax_percent before checking all existing backend queries.
+
+Search the ENTIRE backend for:
+
+tax_percent
+
+and identify every place that reads/writes product tax.
+
+Update all product-related logic to use:
+
+p.cgst_percent
+p.sgst_percent
+
+where appropriate.
+
+==================================================
+10. TAX CALCULATION
+==================================================
+
+The total tax percentage for a product is:
+
+CGST + SGST
+
+Example:
+
+CGST = 9%
+SGST = 9%
+
+Total GST = 18%
+
+Do NOT store only the combined value and lose the individual components.
+
+Store:
+
+cgst_percent = 9
+sgst_percent = 9
+
+When calculating tax:
+
+taxableAmount × cgst_percent / 100
++
+taxableAmount × sgst_percent / 100
+
+The UI/backend can expose the total tax as:
+
+18%
+
+when needed.
+
+==================================================
+11. QUOTATION CALCULATIONS
+==================================================
+
+This is very important.
+
+Inspect the existing quotation calculation service.
+
+Currently quotation calculations may use:
+
+tax_percent
+
+Update the calculation logic so product tax comes from:
+
+cgst_percent
+sgst_percent
+
+For each quotation line:
+
+CGST amount =
+taxable line amount × CGST %
+
+SGST amount =
+taxable line amount × SGST %
+
+Total tax =
+CGST amount + SGST amount
+
+Preserve the existing:
+
+- subtotal
 - discount
-- margin/risk information according to existing permissions
-- quotation status
-- approval state
-- audit/history where already supported
+- net amount
+- margin
+- risk
+- approval logic
 
-But Admin should not gain edit/submit controls merely because recommendations are visible.
-
-==================================================
-10. IMPORTANT: DO NOT CHANGE ROLE DEFINITIONS
-==================================================
-
-Do not introduce a new role.
-
-Do not rename existing roles.
-
-Use the current:
-
-- admin
-- sales representative
-- sales manager/approver
-- finance/operations
-- customer
-
-role architecture.
+Do not alter discount governance.
 
 ==================================================
-11. CHECK ALL QUOTATION DETAIL ENTRY POINTS
+12. QUOTATION ITEM TAX SNAPSHOT
 ==================================================
 
-There may be multiple pages/components that display quotation details.
+Inspect quotation_items.
 
-Search the entire frontend for:
+If quotation_items currently stores:
 
-- UpsellSuggestions
-- Upsell
-- CrossSell
-- productPairing
-- recommendations
-- quotation detail
-- add product to quotation
+tax_percent
 
-Make sure the same incorrect behavior does not exist elsewhere.
+determine whether the existing architecture requires a tax snapshot.
 
-If the same quotation-detail component is reused across roles, implement the permission behavior centrally rather than duplicating logic.
+For production-safe quotation history, quotation items should retain the tax rates used when the quotation was calculated.
 
-==================================================
-12. PRESERVE EXISTING UI
-==================================================
+Prefer:
 
-Do not redesign.
+cgst_percent
+sgst_percent
 
-Do not change:
+on quotation_items if the existing architecture supports storing tax snapshots.
 
-- navigation
-- colors
-- layout
-- typography
-- existing cards
-- existing dashboard structure
+Do NOT blindly depend on the current product's tax forever.
 
-Only change:
+For example:
 
-- visibility
-- interaction permissions
-- explanatory text
-- quotation editing behavior where required
+Product today:
+CGST = 9%
+SGST = 9%
 
-==================================================
-13. TEST CASES
-==================================================
+Quotation created:
+CGST = 9%
+SGST = 9%
 
-Test at minimum:
+Later admin changes product:
+CGST = 7.5%
+SGST = 7.5%
 
-TEST 1 — ADMIN
+The old quotation must still calculate/display using the rates captured for that quotation.
 
-Login as Admin.
-
-Open a Sales Rep quotation.
-
-Expected:
-
-- quotation visible
-- quotation is read-only
-- no editable quantity controls
-- no editable discount controls
-- no Save Draft
-- no Submit for Approval
-- upsell/cross-sell recommendations are read-only OR hidden
-- Admin cannot add recommended products
-
-Also attempt direct API modification.
-
-Expected:
-403/appropriate authorization failure.
-
---------------------------------------------------
-
-TEST 2 — SALES REP
-
-Login as Sales Rep who owns quotation.
-
-Open own quotation.
-
-Expected:
-
-- recommendations visible
-- + buttons available
-- click + on recommendation
-- product added to working quotation
-- totals recalculate
-- margin/risk recalculate
-- Save Draft works
-- Submit for Approval works
-
---------------------------------------------------
-
-TEST 3 — SALES REP SUBMISSION
-
-After adding an upsell/cross-sell product:
-
-Submit quotation.
-
-Expected:
-
-normal quotation submission workflow occurs.
-
-If approval is required:
-
-quotation enters existing approval workflow.
-
-No separate upsell approval request is created.
-
---------------------------------------------------
-
-TEST 4 — MANAGER
-
-Login as Sales Manager.
-
-Open quotation requiring approval.
-
-Expected:
-
-Manager sees quotation and approval controls according to existing permissions.
-
-Manager does not see Sales Rep-only edit controls.
-
---------------------------------------------------
-
-TEST 5 — ADMIN PAIRING CONFIGURATION
-
-Login as Admin.
-
-Go to:
-
-Configuration
-→ Product Pairings
-
-Create/update/deactivate a pairing.
-
-Then open a Sales Rep quotation containing the source product.
-
-Expected:
-
-recommendation comes from the updated database pairing.
-
-No frontend hardcoded pairing is involved.
+Follow the existing quotation snapshot architecture and make the smallest compatible change.
 
 ==================================================
-14. REGRESSION CHECK
+13. INVOICE CALCULATION
 ==================================================
 
-After the change, verify that these existing features still work:
+Search all invoice/billing code for:
 
-- Admin Product Pairings
-- Sales Rep quotation creation
-- Sales Rep quotation editing
-- quotation calculation
-- discount limit checking
-- margin calculation
-- risk calculation
+tax_percent
+tax
+quotation_items.tax_percent
+products.tax_percent
+
+Update invoice generation to use the correct quotation tax snapshot.
+
+Invoices generated from quotations must preserve the quotation's tax values.
+
+Do not introduce a second conflicting tax calculation system.
+
+==================================================
+14. FRONTEND PRODUCT FORM
+==================================================
+
+Modify ONLY the existing Add Product modal.
+
+Current:
+
+Product Name        SKU
+Category             Base Price
+Unit                 Tax %
+Description
+
+Change to:
+
+Product Name        SKU
+Category             Base Price
+Unit                 CGST %
+                     SGST %
+Description
+
+SKU:
+- read-only
+- backend preview
+- never manually editable
+
+CGST:
+- numeric
+- percentage
+- non-negative
+
+SGST:
+- numeric
+- percentage
+- non-negative
+
+Preserve existing validation and UI components where possible.
+
+==================================================
+15. PRODUCT LIST
+==================================================
+
+Inspect the existing Admin Products list.
+
+If the product table currently displays:
+
+SKU
+Tax %
+
+Update it to display:
+
+SKU
+CGST %
+SGST %
+
+Do not redesign the table.
+
+If the table does not currently show tax information, do not add unnecessary columns.
+
+==================================================
+16. PRODUCT EDIT
+==================================================
+
+Inspect the existing Edit Product functionality.
+
+SKU must remain immutable.
+
+Users must NOT be able to edit an existing product's SKU.
+
+For editing an existing product:
+
+Allowed:
+- name
+- category
+- price
+- unit
+- CGST
+- SGST
+- description
+- other existing editable fields
+
+Not allowed:
+- SKU
+
+The backend must also enforce this.
+
+Do not rely only on the frontend.
+
+==================================================
+17. BACKWARD COMPATIBILITY
+==================================================
+
+Before removing tax_percent:
+
+Search the entire repository for:
+
+tax_percent
+
+including:
+
+backend
+frontend
+SQL
+services
+controllers
+queries
+invoice logic
+quotation logic
+billing logic
+seed files
+tests
+
+Replace usages that refer to the product's tax with:
+
+cgst_percent
+sgst_percent
+
+If legacy tax_percent must temporarily remain for compatibility, clearly document why and make sure it does not become the source of truth.
+
+The source of truth for product tax must be:
+
+cgst_percent
+sgst_percent
+
+==================================================
+18. API VALIDATION
+==================================================
+
+Product creation must validate:
+
+name
+category
+base price
+CGST
+SGST
+
+CGST and SGST:
+
+- must be numeric
+- must be >= 0
+- must be <= 100
+
+SKU supplied by the frontend, if present, must be ignored/rejected rather than trusted.
+
+Product creation must always obtain SKU from the database.
+
+==================================================
+19. DUPLICATE SKU PROTECTION
+==================================================
+
+Ensure:
+
+products.sku
+
+has a unique constraint/index.
+
+The backend must never silently overwrite an existing SKU.
+
+If a sequence/configuration problem somehow causes a duplicate, the database should reject it and the API should return a proper error.
+
+==================================================
+20. DO NOT BREAK EXISTING SEED DATA
+==================================================
+
+Existing seed data must remain intact.
+
+Do not delete existing products.
+
+Do not rename products.
+
+Do not regenerate existing SKUs.
+
+Do not change existing product prices unless required for migration.
+
+Do not remove legitimate seed records.
+
+Only synchronize the new SKU sequence to the highest existing SKU.
+
+Example:
+
+Existing:
+
+101
+102
+103
+110
+
+Next generated SKU:
+
+111
+
+NOT:
+
+104
+
+The sequence must continue after the highest existing SKU.
+
+==================================================
+21. DATABASE INITIALIZATION
+==================================================
+
+If this project uses:
+
+ensureAdminConfigurationSchema.js
+
+or another startup schema initialization mechanism, integrate the SKU sequence and tax-column migration consistently with the existing architecture.
+
+Do not create a separate database initialization framework.
+
+Make initialization idempotent.
+
+The backend must start successfully on:
+
+- fresh database
+- existing database
+- seeded database
+
+==================================================
+22. TEST THE COMPLETE FLOW
+==================================================
+
+Test:
+
+A. Existing products
+
+Verify the current maximum SKU.
+
+B. Preview
+
+GET /api/products/next-sku
+
+Verify it returns max SKU + 1.
+
+C. Create product
+
+POST product.
+
+Verify backend assigns the SKU.
+
+D. Create another product.
+
+Verify SKU increments by exactly 1.
+
+E. Existing product SKU
+
+Verify it cannot be changed.
+
+F. CGST/SGST
+
+Create:
+
+CGST = 9
+SGST = 9
+
+Verify stored values are:
+
+cgst_percent = 9
+sgst_percent = 9
+
+G. Quotation
+
+Create a quotation using the product.
+
+Verify:
+
+CGST amount is calculated correctly.
+SGST amount is calculated correctly.
+Total tax = CGST + SGST.
+
+H. Invoice
+
+Generate invoice.
+
+Verify invoice uses the quotation's captured tax values.
+
+I. Concurrency
+
+Simulate two product creation requests.
+
+Verify they receive different sequential SKUs.
+
+==================================================
+23. IMPORTANT: DO NOT MODIFY APPROVAL LOGIC
+==================================================
+
+Do NOT change:
+
+- approval chains
 - approval routing
-- customer negotiation
-- customer confirmation
-- fulfillment
-- billing
+- risk calculation
+- discount ceilings
+- Sales Manager approval
+- Finance approval
 
-Do not modify unrelated functionality.
+This task is ONLY for:
 
-==================================================
-15. FINAL CODE SEARCH
-==================================================
-
-Search for:
-
-- MOCK_
-- mockRecommendations
-- hardcoded product names
-- hardcoded pairing data
-- hardcoded customer data
-- hardcoded quotation data
-
-Do not leave runtime business data hardcoded.
-
-Seed/demo data belongs in PostgreSQL seed.sql.
+1. Backend-generated sequential product SKUs.
+2. CGST + SGST product tax support.
+3. Updating dependent quotation/billing calculations safely.
 
 ==================================================
-16. ACCEPTANCE CRITERIA
+24. FINAL ACCEPTANCE CRITERIA
 ==================================================
 
-The fix is COMPLETE only when:
+The implementation is complete only when all of the following are true:
 
-ADMIN:
+[ ] SKU is generated by backend/database.
+[ ] SKU is sequential from the highest existing SKU.
+[ ] SKU generation is concurrency-safe.
+[ ] SKU is unique.
+[ ] SKU is read-only in Add Product UI.
+[ ] SKU cannot be changed during product edit.
+[ ] Frontend can preview the next SKU from backend.
+[ ] POST product does not trust frontend SKU.
+[ ] Tax % field is replaced by CGST % and SGST %.
+[ ] CGST and SGST are stored separately.
+[ ] Total tax is calculated as CGST + SGST.
+[ ] Quotation calculations use CGST/SGST correctly.
+[ ] Invoice/billing calculations use the correct quotation tax snapshot.
+[ ] Existing seed data is preserved.
+[ ] Existing SKUs are preserved.
+[ ] Existing product functionality continues working.
+[ ] No unrelated frontend redesign.
+[ ] No unrelated backend refactor.
+[ ] Existing APIs remain compatible wherever possible.
+[ ] Backend starts successfully on the existing database.
+[ ] Backend starts successfully on a fresh database.
+[ ] Product creation works.
+[ ] Product editing works without allowing SKU modification.
+[ ] Quotation creation still works.
+[ ] Invoice generation still works.
 
-Configuration
-→ Product Pairings
-→ manages recommendation rules
+After implementing, report:
 
-SALES REP:
+1. Files changed.
+2. Database/schema changes.
+3. How SKU generation works.
+4. How the sequence was synchronized with existing SKUs.
+5. How CGST/SGST are stored.
+6. Which quotation/billing queries were updated.
+7. Tests performed and their results.
 
-Quotation
-→ sees recommendations
-→ clicks +
-→ product added
-→ quotation recalculates
-→ saves
-→ submits
-
-MANAGER:
-
-Approval Queue
-→ reviews
-→ approves/rejects/returns
-
-FINANCE/OPS:
-
-Fulfillment
-→ inventory
-→ backorder
-→ billing
-
-CUSTOMER:
-
-Portal
-→ negotiation
-→ confirmation
-
-There must be NO situation where:
-
-Admin sees an interactive + recommendation button
-BUT
-Admin is told the quotation is read-only.
-
-That inconsistency must be eliminated.
-
-==================================================
-17. FINAL REPORT
-==================================================
-
-Report:
-
-1. Files changed
-2. Components changed
-3. Backend authorization changes, if any
-4. Exact Admin behavior
-5. Exact Sales Rep behavior
-6. Product pairing behavior
-7. Tests performed
-8. Test results
-9. Any remaining issues
-
-Do NOT claim completion unless all acceptance tests pass.
+Do not merely describe the changes.
+Actually inspect the existing codebase and implement them in the correct existing files.

@@ -4,3 +4,4 @@ export const get = async (req, res, next) => { try { const data = await service.
 export const create = async (req, res, next) => { try { res.status(201).json({ success: true, data: await service.createApprovalChain(req.body) }); } catch (error) { next(error); } };
 export const update = async (req, res, next) => { try { res.json({ success: true, data: await service.updateApprovalChain(req.params.id, req.body) }); } catch (error) { next(error); } };
 export const deactivate = async (req, res, next) => { try { res.json({ success: true, data: await service.deactivateApprovalChain(req.params.id) }); } catch (error) { next(error); } };
+export const remove = async (req, res, next) => { try { res.json({ success: true, data: await service.deleteApprovalChain(req.params.id) }); } catch (error) { next(error); } };

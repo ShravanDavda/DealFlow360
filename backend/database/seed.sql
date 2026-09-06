@@ -196,9 +196,8 @@ SELECT setval('discount_rules_id_seq', (SELECT COALESCE(MAX(id), 1) FROM discoun
 
 INSERT INTO approval_chains (name, min_discount_percent, max_discount_percent, min_risk, is_active)
 VALUES
-    ('Standard Management Chain', 10.00, 20.00, 'LOW', TRUE),
-    ('High Discount Executive Chain', 20.00, 35.00, 'MEDIUM', TRUE),
-    ('Strategic Deal Exception Chain', 35.00, 60.00, 'HIGH', TRUE)
+    ('Standard Manager Approval', 0.00, NULL, 'MEDIUM', TRUE),
+    ('High Risk Manager Finance Approval', 0.00, NULL, 'HIGH', TRUE)
 ON CONFLICT (name) DO UPDATE
 SET min_discount_percent = EXCLUDED.min_discount_percent,
     max_discount_percent = EXCLUDED.max_discount_percent,
@@ -207,16 +206,18 @@ SET min_discount_percent = EXCLUDED.min_discount_percent,
 
 SELECT setval('approval_chains_id_seq', (SELECT COALESCE(MAX(id), 1) FROM approval_chains));
 
+UPDATE approval_chains
+SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP
+WHERE name IN ('Standard Management Chain', 'High Discount Executive Chain', 'Strategic Deal Exception Chain');
+
 DELETE FROM approval_chain_steps WHERE approval_chain_id IN (
-    SELECT id FROM approval_chains WHERE name IN ('Standard Management Chain', 'High Discount Executive Chain', 'Strategic Deal Exception Chain')
+    SELECT id FROM approval_chains WHERE name IN ('Standard Manager Approval', 'High Risk Manager Finance Approval')
 );
 INSERT INTO approval_chain_steps (approval_chain_id, step_order, approver_role)
 VALUES
-    ((SELECT id FROM approval_chains WHERE name = 'Standard Management Chain'), 1, 'Sales Manager'),
-    ((SELECT id FROM approval_chains WHERE name = 'High Discount Executive Chain'), 1, 'Sales Manager'),
-    ((SELECT id FROM approval_chains WHERE name = 'High Discount Executive Chain'), 2, 'Finance'),
-    ((SELECT id FROM approval_chains WHERE name = 'Strategic Deal Exception Chain'), 1, 'Sales Manager'),
-    ((SELECT id FROM approval_chains WHERE name = 'Strategic Deal Exception Chain'), 2, 'Finance');
+    ((SELECT id FROM approval_chains WHERE name = 'Standard Manager Approval'), 1, 'Sales Manager'),
+    ((SELECT id FROM approval_chains WHERE name = 'High Risk Manager Finance Approval'), 1, 'Sales Manager'),
+    ((SELECT id FROM approval_chains WHERE name = 'High Risk Manager Finance Approval'), 2, 'Finance');
 
 SELECT setval('approval_chain_steps_id_seq', (SELECT COALESCE(MAX(id), 1) FROM approval_chain_steps));
 
@@ -316,7 +317,7 @@ VALUES
     
     ('Q-1042', (SELECT id FROM customers WHERE customer_code = 'CUST-001'), (SELECT id FROM users WHERE email = 'salesrep1@dealflow360.com'), (SELECT id FROM price_lists WHERE name = 'Standard Price List'), 'Pending Approval', 3030.00, 369.00, 399.15, 3060.15, 31.50, 'HIGH', 'Sales Manager', 'Net 30', 'Customer requested rollout by end of month', 'Setup service discount is 18% vs 10% ceiling'),
     
-    ('Q-1039', (SELECT id FROM customers WHERE customer_code = 'CUST-002'), (SELECT id FROM users WHERE email = 'salesrep1@dealflow360.com'), (SELECT id FROM price_lists WHERE name = 'Standard Price List'), 'Pending Approval', 28900.00, 3500.00, 3810.00, 29210.00, 28.40, 'MEDIUM', 'Finance', 'Net 45', 'Enterprise expansion deal', 'Discount exceeds 20%; escalated to finance for margin review'),
+    ('Q-1039', (SELECT id FROM customers WHERE customer_code = 'CUST-002'), (SELECT id FROM users WHERE email = 'salesrep1@dealflow360.com'), (SELECT id FROM price_lists WHERE name = 'Standard Price List'), 'Pending Approval', 28900.00, 3500.00, 3810.00, 29210.00, 28.40, 'MEDIUM', 'Sales Manager', 'Net 45', 'Enterprise expansion deal', 'Discount exceeds 20%; escalated to management review'),
     
     ('Q-1035', (SELECT id FROM customers WHERE customer_code = 'CUST-003'), (SELECT id FROM users WHERE email = 'salesrep1@dealflow360.com'), (SELECT id FROM price_lists WHERE name = 'Standard Price List'), 'Approved', 9750.00, 450.00, 1395.00, 10695.00, 34.00, 'LOW', 'Auto-Approved', 'Net 30', 'Standard catalog purchase', 'Within bronze tier ceiling'),
     
@@ -449,37 +450,38 @@ DELETE FROM quotation_approval_requests WHERE quotation_id IN (
 
 INSERT INTO quotation_approval_requests (quotation_id, approval_chain_id, submitted_by, status)
 VALUES
-    ((SELECT id FROM quotations WHERE quote_code = 'Q-1042'), (SELECT id FROM approval_chains WHERE name = 'Standard Management Chain'), (SELECT id FROM users WHERE email = 'salesrep1@dealflow360.com'), 'PENDING'),
-    ((SELECT id FROM quotations WHERE quote_code = 'Q-1039'), (SELECT id FROM approval_chains WHERE name = 'High Discount Executive Chain'), (SELECT id FROM users WHERE email = 'salesrep1@dealflow360.com'), 'PENDING'),
-    ((SELECT id FROM quotations WHERE quote_code = 'Q-108'), (SELECT id FROM approval_chains WHERE name = 'Standard Management Chain'), (SELECT id FROM users WHERE email = 'salesrep1@dealflow360.com'), 'APPROVED'),
-    ((SELECT id FROM quotations WHERE quote_code = 'Q-109'), (SELECT id FROM approval_chains WHERE name = 'High Discount Executive Chain'), (SELECT id FROM users WHERE email = 'salesrep1@dealflow360.com'), 'REJECTED');
+    ((SELECT id FROM quotations WHERE quote_code = 'Q-1042'), (SELECT id FROM approval_chains WHERE name = 'High Risk Manager Finance Approval'), (SELECT id FROM users WHERE email = 'salesrep1@dealflow360.com'), 'PENDING'),
+    ((SELECT id FROM quotations WHERE quote_code = 'Q-1039'), (SELECT id FROM approval_chains WHERE name = 'Standard Manager Approval'), (SELECT id FROM users WHERE email = 'salesrep1@dealflow360.com'), 'PENDING'),
+    ((SELECT id FROM quotations WHERE quote_code = 'Q-108'), (SELECT id FROM approval_chains WHERE name = 'Standard Manager Approval'), (SELECT id FROM users WHERE email = 'salesrep1@dealflow360.com'), 'APPROVED'),
+    ((SELECT id FROM quotations WHERE quote_code = 'Q-109'), (SELECT id FROM approval_chains WHERE name = 'High Risk Manager Finance Approval'), (SELECT id FROM users WHERE email = 'salesrep1@dealflow360.com'), 'REJECTED');
 
 INSERT INTO quotation_approval_steps (approval_request_id, approval_chain_step_id, step_order, approver_role, status, approver_id, comment)
 VALUES
     
     ((SELECT id FROM quotation_approval_requests WHERE quotation_id = (SELECT id FROM quotations WHERE quote_code = 'Q-1042')),
-     (SELECT id FROM approval_chain_steps WHERE approval_chain_id = (SELECT id FROM approval_chains WHERE name = 'Standard Management Chain') AND step_order = 1),
+    (SELECT id FROM approval_chain_steps WHERE approval_chain_id = (SELECT id FROM approval_chains WHERE name = 'High Risk Manager Finance Approval') AND step_order = 1),
      1, 'Sales Manager', 'PENDING', (SELECT id FROM users WHERE email = 'manager@dealflow360.com'), NULL),
+
+    ((SELECT id FROM quotation_approval_requests WHERE quotation_id = (SELECT id FROM quotations WHERE quote_code = 'Q-1042')),
+    (SELECT id FROM approval_chain_steps WHERE approval_chain_id = (SELECT id FROM approval_chains WHERE name = 'High Risk Manager Finance Approval') AND step_order = 2),
+    2, 'Finance', 'WAITING', NULL, NULL),
 
     
     ((SELECT id FROM quotation_approval_requests WHERE quotation_id = (SELECT id FROM quotations WHERE quote_code = 'Q-1039')),
-     (SELECT id FROM approval_chain_steps WHERE approval_chain_id = (SELECT id FROM approval_chains WHERE name = 'High Discount Executive Chain') AND step_order = 1),
-     1, 'Sales Manager', 'APPROVED', (SELECT id FROM users WHERE email = 'manager@dealflow360.com'), 'Approved by Sales Manager; volume discount acceptable for strategic partner'),
-    ((SELECT id FROM quotation_approval_requests WHERE quotation_id = (SELECT id FROM quotations WHERE quote_code = 'Q-1039')),
-     (SELECT id FROM approval_chain_steps WHERE approval_chain_id = (SELECT id FROM approval_chains WHERE name = 'High Discount Executive Chain') AND step_order = 2),
-     2, 'Finance', 'PENDING', (SELECT id FROM users WHERE email = 'finance@dealflow360.com'), NULL),
+    (SELECT id FROM approval_chain_steps WHERE approval_chain_id = (SELECT id FROM approval_chains WHERE name = 'Standard Manager Approval') AND step_order = 1),
+        1, 'Sales Manager', 'PENDING', NULL, NULL),
 
     
     ((SELECT id FROM quotation_approval_requests WHERE quotation_id = (SELECT id FROM quotations WHERE quote_code = 'Q-108')),
-     (SELECT id FROM approval_chain_steps WHERE approval_chain_id = (SELECT id FROM approval_chains WHERE name = 'Standard Management Chain') AND step_order = 1),
+    (SELECT id FROM approval_chain_steps WHERE approval_chain_id = (SELECT id FROM approval_chains WHERE name = 'Standard Manager Approval') AND step_order = 1),
      1, 'Sales Manager', 'APPROVED', (SELECT id FROM users WHERE email = 'manager@dealflow360.com'), 'Approved post-negotiation counter-offer of 10%'),
 
     
     ((SELECT id FROM quotation_approval_requests WHERE quotation_id = (SELECT id FROM quotations WHERE quote_code = 'Q-109')),
-     (SELECT id FROM approval_chain_steps WHERE approval_chain_id = (SELECT id FROM approval_chains WHERE name = 'High Discount Executive Chain') AND step_order = 1),
+    (SELECT id FROM approval_chain_steps WHERE approval_chain_id = (SELECT id FROM approval_chains WHERE name = 'High Risk Manager Finance Approval') AND step_order = 1),
      1, 'Sales Manager', 'APPROVED', (SELECT id FROM users WHERE email = 'manager@dealflow360.com'), 'Manager endorsed for market share grab'),
     ((SELECT id FROM quotation_approval_requests WHERE quotation_id = (SELECT id FROM quotations WHERE quote_code = 'Q-109')),
-     (SELECT id FROM approval_chain_steps WHERE approval_chain_id = (SELECT id FROM approval_chains WHERE name = 'High Discount Executive Chain') AND step_order = 2),
+    (SELECT id FROM approval_chain_steps WHERE approval_chain_id = (SELECT id FROM approval_chains WHERE name = 'High Risk Manager Finance Approval') AND step_order = 2),
      2, 'Finance', 'REJECTED', (SELECT id FROM users WHERE email = 'finance@dealflow360.com'), 'Finance rejected: 45% discount produces negative deal operating contribution');
 
 SELECT setval('quotation_approval_requests_id_seq', (SELECT COALESCE(MAX(id), 1) FROM quotation_approval_requests));
@@ -625,3 +627,13 @@ VALUES
 SELECT setval('deal_health_anomalies_id_seq', (SELECT COALESCE(MAX(id), 1) FROM deal_health_anomalies));
 
 UPDATE users SET is_active = TRUE, status = 'active', registration_status = 'APPROVED' WHERE role = 'customer';
+
+UPDATE products
+SET cgst_percent = tax_percent / 2,
+    sgst_percent = tax_percent / 2
+WHERE tax_percent <> 0 AND cgst_percent = 0 AND sgst_percent = 0;
+
+UPDATE quotation_items
+SET cgst_percent = tax_percent / 2,
+    sgst_percent = tax_percent / 2
+WHERE tax_percent <> 0 AND cgst_percent = 0 AND sgst_percent = 0;

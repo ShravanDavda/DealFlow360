@@ -1,0 +1,33 @@
+import pool from "./src/config/db.js";
+const BASE_URL = "http://localhost:5000/api";
+const request = async (method, path, body, token = "") => { const options = { method, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } }; if (body !== undefined) options.body = JSON.stringify(body); const response = await fetch(`${BASE_URL}${path}`, options); return { status: response.status, data: await response.json() }; };
+const assert = (condition, message) => { if (!condition) throw new Error(message); console.log(`PASS: ${message}`); };
+const run = async () => {
+  const adminLogin = await request("POST", "/auth/login", { email: "admin@dealflow360.com", password: "password123" });
+  const repLogin = await request("POST", "/auth/login", { email: "salesrep1@dealflow360.com", password: "password123" });
+  assert(adminLogin.status === 200 && repLogin.status === 200, "Admin and Sales Rep login");
+  const adminToken = adminLogin.data.data.token; const repToken = repLogin.data.data.token;
+  const maxResult = await pool.query("SELECT GREATEST(COALESCE((SELECT last_value FROM product_sku_seq), 0), COALESCE((SELECT MAX(CASE WHEN sku ~ '^[0-9]+$' THEN sku::BIGINT WHEN sku ~ '^PROD-[0-9]+$' THEN SUBSTRING(sku FROM 6)::BIGINT END) FROM products), 0)) AS max_sku");
+  const preview = await request("GET", "/products/next-sku", undefined, adminToken);
+  assert(preview.status === 200 && Number(preview.data.data.sku) === Number(maxResult.rows[0].max_sku || 0) + 1, "Next SKU preview equals highest existing numeric SKU plus one");
+  const payload = { categoryId: 1, name: `SKU Tax Probe ${Date.now()}`, baseCost: 100, unit: "Each", cgstPercent: 9, sgstPercent: 9 };
+  const [first, second] = await Promise.all([request("POST", "/products", payload, adminToken), request("POST", "/products", { ...payload, name: `${payload.name} B` }, adminToken)]);
+  assert(first.status === 201 && second.status === 201, "Concurrent product creation succeeds");
+  const products = [first.data.data, second.data.data]; const skuValues = products.map((product) => Number(product.sku)).sort((a, b) => a - b);
+  assert(skuValues[1] === skuValues[0] + 1, "Concurrent products receive unique sequential SKUs");
+  const dbProduct = await pool.query("SELECT sku, cgst_percent, sgst_percent FROM products WHERE id = ANY($1::int[])", [products.map((product) => product.id)]);
+  assert(dbProduct.rows.every((row) => Number(row.cgst_percent) === 9 && Number(row.sgst_percent) === 9), "CGST and SGST persist separately in PostgreSQL");
+  const attemptedSku = await request("PUT", `/products/${products[0].id}`, { sku: "999999", categoryId: 1, name: products[0].name, baseCost: 100, unit: "Each", cgstPercent: 9, sgstPercent: 9 }, adminToken);
+  assert(attemptedSku.status === 200 && attemptedSku.data.data.sku === products[0].sku, "Product SKU remains immutable on edit");
+  await pool.query("INSERT INTO price_list_items (price_list_id, product_id, unit_price, min_quantity, is_active) VALUES (1, $1, 100, 1, TRUE)", [products[0].id]);
+  const quote = await request("POST", "/quotations", { customerId: 1, priceListId: 1, items: [{ productId: products[0].id, quantity: 1, discountPercent: 0 }] }, repToken);
+  assert(quote.status === 201, "Quotation can use the new product");
+  const quoteRow = await pool.query("SELECT tax_amount FROM quotations WHERE id = $1", [quote.data.data.dbId]);
+  assert(Number(quoteRow.rows[0].tax_amount) > 0, "Quotation calculates combined CGST plus SGST tax");
+  const taxSnapshot = await pool.query("SELECT cgst_percent, sgst_percent, tax_percent FROM quotation_items WHERE quotation_id = $1", [quote.data.data.dbId]);
+  assert(Number(taxSnapshot.rows[0].cgst_percent) === 9 && Number(taxSnapshot.rows[0].sgst_percent) === 9 && Number(taxSnapshot.rows[0].tax_percent) === 18, "Quotation item stores CGST, SGST, and combined tax snapshot");
+  await pool.query("DELETE FROM quotations WHERE id = $1", [quote.data.data.dbId]);
+  for (const product of products) { await pool.query("DELETE FROM product_pairings WHERE base_product_id = $1 OR suggested_product_id = $1", [product.id]); await pool.query("DELETE FROM price_list_items WHERE product_id = $1", [product.id]); await pool.query("DELETE FROM warehouse_inventory WHERE product_id = $1", [product.id]); await pool.query("DELETE FROM subscription_plan_products WHERE product_id = $1", [product.id]); await pool.query("DELETE FROM discount_rules WHERE product_id = $1", [product.id]); await pool.query("DELETE FROM product_variants WHERE product_id = $1", [product.id]); await pool.query("DELETE FROM products WHERE id = $1", [product.id]); }
+  await pool.end(); console.log("Product SKU/tax E2E passed.");
+};
+run().catch((error) => { console.error(`Product SKU/tax E2E failed: ${error.message}`); process.exit(1); });

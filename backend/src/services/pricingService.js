@@ -24,7 +24,9 @@ export const resolveQuotationLine = async ({ client, customerId, priceListId, pr
     if (!priceList) throw new Error("Price list not found or inactive");
 
     const productRes = await db.query(
-        `SELECT p.id, p.name, p.base_cost AS "baseCost", p.unit, p.tax_percent AS "taxPercent",
+        `SELECT p.id, p.name, p.base_cost AS "baseCost", p.unit,
+                COALESCE(NULLIF(p.cgst_percent, 0), p.tax_percent / 2, 0) AS "cgstPercent",
+                COALESCE(NULLIF(p.sgst_percent, 0), p.tax_percent / 2, 0) AS "sgstPercent",
                 p.is_subscription AS "isRecurring", p.recurring_cycle AS "recurringCycle",
                 c.id AS "categoryId", c.name AS category, c.discount_ceiling AS "categoryCeiling"
          FROM products p JOIN categories c ON c.id = p.category_id
@@ -95,7 +97,9 @@ export const resolveQuotationLine = async ({ client, customerId, priceListId, pr
         unitPrice: Number(priceItem.unitPrice),
         baseCost: Number(product.baseCost || 0),
         unit: product.unit || "Each",
-        taxPercent: Number(product.taxPercent || 0),
+        cgstPercent: Number(product.cgstPercent || 0),
+        sgstPercent: Number(product.sgstPercent || 0),
+        taxPercent: Number(product.cgstPercent || 0) + Number(product.sgstPercent || 0),
         isRecurring: Boolean(product.isRecurring),
         recurringCycle: product.recurringCycle || null,
         quantity: qty

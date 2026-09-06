@@ -18,7 +18,9 @@ export const calculateQuotation = async ({ client, customerId, priceListId, item
         const grossAmount = line.unitPrice * line.quantity;
         const discountAmount = grossAmount * line.discountPercent / 100;
         const netAmount = grossAmount - discountAmount;
-        const lineTax = netAmount * line.taxPercent / 100;
+        const cgstAmount = netAmount * Number(line.cgstPercent || 0) / 100;
+        const sgstAmount = netAmount * Number(line.sgstPercent || 0) / 100;
+        const lineTax = cgstAmount + sgstAmount;
         const lineCost = line.baseCost * line.quantity;
         const marginPercent = netAmount > 0 ? ((netAmount - lineCost) / netAmount) * 100 : 0;
         const overBy = Math.max(0, line.discountPercent - allowedDiscount);
@@ -41,6 +43,11 @@ export const calculateQuotation = async ({ client, customerId, priceListId, item
             discountAmount,
             grossAmount,
             netAmount,
+            cgstPercent: Number(line.cgstPercent || 0),
+            sgstPercent: Number(line.sgstPercent || 0),
+            cgstAmount,
+            sgstAmount,
+            taxPercent: Number(line.cgstPercent || 0) + Number(line.sgstPercent || 0),
             taxAmount: lineTax,
             lineTotal: netAmount + lineTax,
             marginPercent,
@@ -61,7 +68,7 @@ export const calculateQuotation = async ({ client, customerId, priceListId, item
         .filter((chain) => chain.maxDiscountPercent === null || maxSingleViolation <= Number(chain.maxDiscountPercent))
         .sort((a, b) => Number(b.minDiscountPercent || 0) - Number(a.minDiscountPercent || 0))[0];
     const requiredApproval = matchingChain?.steps?.map((step) => step.approverRole).join(" then ")
-        || (blendedRisk === "HIGH" ? "Sales Manager then Finance" : blendedRisk === "MEDIUM" ? "Sales Manager" : "None");
+        || (blendedRisk === "LOW" ? "None" : "Configured approval chain required");
 
     return {
         items: evaluatedItems,
