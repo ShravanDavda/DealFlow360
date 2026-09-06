@@ -1,28 +1,37 @@
-import React, { useState } from 'react';
-import { NavLink, Link, useLocation } from 'react-router-dom';
-import { ShieldCheck, Menu, X, MessageSquare, User, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
+import { ShieldCheck, Menu, X, MessageSquare, User, FileText, LogOut } from 'lucide-react';
+import { getCurrentUser } from '../../services/authService';
 
-/**
- * CustomerNavbar - Dedicated customer-facing navigation bar.
- * Strict customer privacy rule: Excludes all internal employee navigation
- * (Dashboard, Approvals, Fulfillment, Invoices, Deal Health, Reports, etc.).
- * Exposes only: My Quotation, Messages, and Profile.
- */
-export const CustomerNavbar = ({ quoteId = 'Q-1042' }) => {
+export const CustomerNavbar = ({ quoteId }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const location = useLocation();
+  const navigate = useNavigate();
 
-  const isQuoteActive = location.pathname.startsWith('/customer/quotes') || location.pathname.startsWith('/customer');
+  useEffect(() => {
+    getCurrentUser()
+      .then((res) => {
+        if (res?.data) setCurrentUser(res.data);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate('/login', { replace: true });
+  };
+
+  const isQuotesActive = location.pathname.startsWith('/customer/quotes') || location.pathname === '/customer';
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           
-          {/* Customer Portal Brand & Logo */}
           <div className="flex items-center gap-3">
             <Link 
-              to={`/customer/quotes/${quoteId}`} 
+              to="/customer/quotes" 
               className="flex items-center gap-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 rounded-md p-1"
               aria-label="DealFlow360 Customer Portal Home"
             >
@@ -40,42 +49,39 @@ export const CustomerNavbar = ({ quoteId = 'Q-1042' }) => {
             </Link>
           </div>
 
-          {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center space-x-1" aria-label="Customer Navigation">
+          <nav className="hidden md:flex items-center space-x-2" aria-label="Customer Navigation">
             <NavLink
-              to={`/customer/quotes/${quoteId}`}
+              to="/customer/quotes"
               className={() =>
                 `flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
-                  isQuoteActive
+                  isQuotesActive
                     ? 'bg-slate-900 text-white font-medium shadow-sm'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
                 }`
               }
             >
               <FileText className="h-4 w-4" />
-              <span>My Quotation</span>
+              <span>My Quotations</span>
             </NavLink>
 
-            <button
-              type="button"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium transition-colors cursor-pointer"
-              title="Customer messages (future)"
-            >
-              <MessageSquare className="h-4 w-4" />
-              <span>Messages</span>
-            </button>
+            {currentUser && (
+              <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-500 border-l border-slate-200 ml-2">
+                <User className="h-3.5 w-3.5 text-slate-400" />
+                <span className="font-semibold text-slate-700">{currentUser.companyName || currentUser.email}</span>
+              </div>
+            )}
 
             <button
               type="button"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium transition-colors cursor-pointer"
-              title="Customer profile (future)"
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm text-slate-600 hover:text-rose-600 hover:bg-rose-50 font-medium transition-colors cursor-pointer"
+              title="Sign out"
             >
-              <User className="h-4 w-4" />
-              <span>Profile</span>
+              <LogOut className="h-4 w-4" />
+              <span>Sign out</span>
             </button>
           </nav>
 
-          {/* Mobile Menu Toggle Button */}
           <div className="md:hidden flex items-center">
             <button
               type="button"
@@ -94,40 +100,39 @@ export const CustomerNavbar = ({ quoteId = 'Q-1042' }) => {
         </div>
       </div>
 
-      {/* Mobile Dropdown Menu */}
       {isMobileMenuOpen && (
         <div className="md:hidden border-t border-slate-200 bg-white px-4 pt-2 pb-3 space-y-1">
           <NavLink
-            to={`/customer/quotes/${quoteId}`}
+            to="/customer/quotes"
             onClick={() => setIsMobileMenuOpen(false)}
             className={() =>
               `flex items-center gap-2 px-3 py-2 rounded-md text-base transition-colors ${
-                isQuoteActive
+                isQuotesActive
                   ? 'bg-slate-900 text-white font-medium'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
               }`
             }
           >
             <FileText className="h-5 w-5" />
-            <span>My Quotation</span>
+            <span>My Quotations</span>
           </NavLink>
 
-          <button
-            type="button"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-base text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium transition-colors text-left"
-          >
-            <MessageSquare className="h-5 w-5" />
-            <span>Messages</span>
-          </button>
+          {currentUser && (
+            <div className="px-3 py-2 text-xs font-semibold text-slate-500">
+              Signed in as: {currentUser.companyName || currentUser.email}
+            </div>
+          )}
 
           <button
             type="button"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-base text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium transition-colors text-left"
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              handleLogout();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-base text-rose-600 hover:bg-rose-50 font-medium transition-colors text-left"
           >
-            <User className="h-5 w-5" />
-            <span>Profile</span>
+            <LogOut className="h-5 w-5" />
+            <span>Sign out</span>
           </button>
         </div>
       )}

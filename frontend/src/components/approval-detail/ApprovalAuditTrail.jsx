@@ -9,12 +9,6 @@ const ACTION_BADGES = {
   Rejected: 'bg-red-50 text-red-700 border-red-200',
 };
 
-/**
- * ApprovalAuditTrail - Displays chronological history of user actions on the quotation.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.auditTrail - List of audit entries { id, user, action, date, note }
- */
 export const ApprovalAuditTrail = ({ auditTrail = [] }) => {
   return (
     <div className="space-y-4">

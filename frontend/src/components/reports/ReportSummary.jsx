@@ -1,18 +1,11 @@
 import React from 'react';
 import { FileText, Clock, TrendingUp } from 'lucide-react';
 
-/**
- * ReportSummary - Renders the three summary metric cards for the reporting dashboard:
- * Quotes Created, Avg Approval Time, and Top Upsell Product.
- * 
- * @param {Object} props
- * @param {Object} props.metrics - { quotesCreated, avgApprovalTime, topUpsellProduct }
- */
 export const ReportSummary = ({
   metrics = {
-    quotesCreated: 148,
-    avgApprovalTime: '6.4 hours',
-    topUpsellProduct: 'Care Plan 2yr',
+    quotesCreated: 0,
+    avgApprovalTime: '0.0 hours',
+    topUpsellProduct: 'None',
   },
 }) => {
   const cards = [

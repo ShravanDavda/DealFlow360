@@ -3,22 +3,15 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Package, Clock } from 'lucide-react';
 import { DashboardNavbar } from '../components/dashboard/DashboardNavbar';
 
-/**
- * ProductDetailPlaceholder - Controlled placeholder for /products/:productId
- * to prevent broken routes when clicking product rows before Page 17 is built.
- */
 export const ProductDetailPlaceholder = () => {
   const { productId } = useParams();
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* 1. Top Navigation */}
       <DashboardNavbar />
 
-      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         
-        {/* Navigation Breadcrumb / Back Link */}
         <div>
           <Link
             to="/products"
@@ -29,7 +22,6 @@ export const ProductDetailPlaceholder = () => {
           </Link>
         </div>
 
-        {/* Placeholder Card */}
         <div className="bg-white border border-slate-200 rounded-lg p-10 shadow-sm flex flex-col items-center justify-center text-center max-w-2xl mx-auto space-y-4">
           <div className="h-14 w-14 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 shadow-sm">
             <Package className="h-7 w-7" />

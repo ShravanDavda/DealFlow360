@@ -1,12 +1,6 @@
 import React from 'react';
 import { Package } from 'lucide-react';
 
-/**
- * ProductGeneralInfo - Displays general product specifications and pricing metadata.
- * 
- * @param {Object} props
- * @param {Object} props.product - Detailed product object
- */
 export const ProductGeneralInfo = ({ product }) => {
   if (!product) return null;
 
@@ -20,7 +14,6 @@ export const ProductGeneralInfo = ({ product }) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12 text-sm">
-        {/* Left Column */}
         <div className="space-y-4">
           <div>
             <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -68,7 +61,6 @@ export const ProductGeneralInfo = ({ product }) => {
           </div>
         </div>
 
-        {/* Right Column */}
         <div className="space-y-4">
           <div>
             <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">

@@ -1,12 +1,6 @@
 import React from 'react';
 import { Tag } from 'lucide-react';
 
-/**
- * ProductPricelistTable - Displays configured pricelists, currencies, and pricing rules.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.pricelists - Array of pricelist objects { tier, currency, priceRule }
- */
 export const ProductPricelistTable = ({ pricelists = [] }) => {
   return (
     <div className="space-y-3">

@@ -1,12 +1,6 @@
 import React from 'react';
 import { Activity } from 'lucide-react';
 
-/**
- * RecentActivity - Displays a clean vertical list of recent events or activities.
- * 
- * @param {Object} props
- * @param {Array<Object|string>} props.activities - List of activity items
- */
 export const RecentActivity = ({ activities = [] }) => {
   return (
     <div className="bg-white p-6 shadow-sm border border-slate-200 rounded-lg">

@@ -1,31 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CheckCircle2, BarChart3, FileDown, Sheet } from 'lucide-react';
 import { DashboardNavbar } from '../components/dashboard/DashboardNavbar';
 import { ReportFilters } from '../components/reports/ReportFilters';
 import { ReportSummary } from '../components/reports/ReportSummary';
 import { Button } from '../components/ui/Button';
-
-// ============================================================================
-// FRONTEND MOCK DATA & FUTURE BACKEND API CONTRACT
-// ============================================================================
-// API 1: GET /api/reports?period=this-month&salesTeam=all&approvalStatus=all&product=all
-//   Returns { metrics: { quotesCreated: 148, avgApprovalTimeHours: 6.4, topUpsellProduct: "Care Plan 2yr" } }
-// API 2: GET /api/reports/export/pdf
-// API 3: GET /api/reports/export/xls
-// ============================================================================
-const MOCK_REPORT_DATA = {
-  filters: {
-    periods: ['This Month', 'Last Month', 'This Quarter'],
-    salesTeams: ['All Teams', 'Enterprise', 'SMB'],
-    approvalStatuses: ['All', 'Pending', 'Approved', 'Returned'],
-    products: ['All Products', 'Laptop Pro 14', 'Care Plan 2yr', 'Support SLA'],
-  },
-  metrics: {
-    quotesCreated: 148,
-    avgApprovalTime: '6.4 hours',
-    topUpsellProduct: 'Care Plan 2yr',
-  },
-};
+import { getReports, exportReportXls } from '../services/reportService';
 
 export const Reports = () => {
   const [selectedFilters, setSelectedFilters] = useState({
@@ -35,8 +14,34 @@ export const Reports = () => {
     product: 'All Products',
   });
 
-  const [reportData] = useState(MOCK_REPORT_DATA);
+  const [reportData, setReportData] = useState({
+    filters: {
+      periods: ['This Month', 'Last Month', 'This Quarter'],
+      salesTeams: ['All Teams', 'Enterprise', 'SMB'],
+      approvalStatuses: ['All', 'Pending', 'Approved', 'Returned'],
+      products: ['All Products'],
+    },
+    metrics: {
+      quotesCreated: 0,
+      avgApprovalTime: '0.0 hours',
+      topUpsellProduct: 'None',
+    },
+  });
+
   const [feedbackMessage, setFeedbackMessage] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+    getReports(selectedFilters)
+      .then((res) => {
+        if (isMounted && res) setReportData(res);
+      })
+      .catch((err) => console.error('Failed to load reports:', err));
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedFilters]);
 
   const handleFilterChange = (field, value) => {
     setSelectedFilters((prev) => ({
@@ -46,44 +51,62 @@ export const Reports = () => {
   };
 
   const handleExportPDF = () => {
-    setFeedbackMessage('PDF export requested.');
+    const text = `DEALFLOW360 EXECUTIVE REPORT\nPeriod: ${selectedFilters.period}\nTeam: ${selectedFilters.salesTeam}\nQuotes Created: ${reportData.metrics?.quotesCreated}\nAvg Approval Time: ${reportData.metrics?.avgApprovalTime}\nTop Upsell: ${reportData.metrics?.topUpsellProduct}\n`;
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dealflow360-report-${selectedFilters.period.toLowerCase().replace(' ', '-')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    setFeedbackMessage('Executive PDF/Text report exported successfully.');
     setTimeout(() => setFeedbackMessage(''), 4500);
   };
 
-  const handleExportXLS = () => {
-    setFeedbackMessage('XLS export requested.');
-    setTimeout(() => setFeedbackMessage(''), 4500);
+  const handleExportXLS = async () => {
+    try {
+      const blob = await exportReportXls(selectedFilters);
+      const url = URL.createObjectURL(new Blob([blob], { type: 'text/csv' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `dealflow360-report-${selectedFilters.period.toLowerCase().replace(' ', '-')}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      setFeedbackMessage('Sales spreadsheet (CSV/XLS) exported successfully.');
+      setTimeout(() => setFeedbackMessage(''), 4500);
+    } catch (err) {
+      console.error('Failed to export CSV:', err);
+      setFeedbackMessage('Failed to export CSV report.');
+      setTimeout(() => setFeedbackMessage(''), 4500);
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* 1. Top Navigation - Reusing DealFlow360 Internal Navbar */}
       <DashboardNavbar />
 
-      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
-        {/* 2. Page Header */}
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
             <div className="p-1.5 rounded-md bg-slate-900 text-white shadow-sm">
               <BarChart3 className="h-5 w-5" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Admin / Reporting Dashboard (Optional)
+              Admin & Operations Reporting Dashboard
             </h1>
           </div>
           <p className="text-sm text-slate-600">
-            Sales trends, approval bottlenecks and platform usage
+            Sales momentum, approval bottleneck indicators, discount governance trends, and top products.
           </p>
         </div>
 
-        {/* Action Confirmation Banner */}
         {feedbackMessage && (
           <div 
             className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center gap-3 shadow-sm transition-all animate-in fade-in"
             role="status"
-            aria-live="polite"
           >
             <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
             <span className="text-sm font-semibold text-emerald-900">
@@ -92,7 +115,6 @@ export const Reports = () => {
           </div>
         )}
 
-        {/* 3. Horizontal Filter Section (4 Fields) */}
         <section aria-label="Report Filters">
           <ReportFilters
             filters={selectedFilters}
@@ -101,7 +123,6 @@ export const Reports = () => {
           />
         </section>
 
-        {/* 4. Three Summary Cards */}
         <section aria-label="Key Reporting Metrics">
           {reportData.metrics ? (
             <ReportSummary metrics={reportData.metrics} />
@@ -112,7 +133,6 @@ export const Reports = () => {
           )}
         </section>
 
-        {/* 5. Export Actions */}
         <section 
           aria-label="Export Actions" 
           className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-start gap-3"
@@ -124,7 +144,7 @@ export const Reports = () => {
             className="sm:!w-auto px-5 gap-2 border-slate-300 text-slate-700 hover:bg-slate-100"
           >
             <FileDown className="h-4 w-4 text-slate-600" />
-            <span>Export PDF</span>
+            <span>Export Summary</span>
           </Button>
 
           <Button
@@ -134,7 +154,7 @@ export const Reports = () => {
             className="sm:!w-auto px-5 gap-2 border-slate-300 text-slate-700 hover:bg-slate-100"
           >
             <Sheet className="h-4 w-4 text-slate-600" />
-            <span>Export XLS</span>
+            <span>Export CSV / XLS</span>
           </Button>
         </section>
 

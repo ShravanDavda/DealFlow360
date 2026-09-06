@@ -1,13 +1,6 @@
 import React from 'react';
 import { Check, Clock, CircleDot } from 'lucide-react';
 
-/**
- * InvoiceTimeline - Displays the 4-step payment and invoice lifecycle.
- * Order Confirmed -> Shipped -> Invoiced -> Paid
- * 
- * @param {Object} props
- * @param {Array<Object>} props.timeline - Array of stages { id, label, status }
- */
 export const InvoiceTimeline = ({ timeline = [] }) => {
   return (
     <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
@@ -19,7 +12,6 @@ export const InvoiceTimeline = ({ timeline = [] }) => {
       </div>
 
       <div className="pt-2">
-        {/* Desktop / Tablet Horizontal Stepper */}
         <div className="hidden sm:flex items-center justify-between relative">
           {timeline.map((stage, idx) => {
             const isCompleted = stage.status === 'completed';
@@ -28,7 +20,6 @@ export const InvoiceTimeline = ({ timeline = [] }) => {
 
             return (
               <React.Fragment key={stage.id}>
-                {/* Step Circle & Label */}
                 <div className="flex flex-col items-center text-center z-10 min-w-[100px]">
                   <div
                     className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
@@ -63,7 +54,6 @@ export const InvoiceTimeline = ({ timeline = [] }) => {
                   </span>
                 </div>
 
-                {/* Connector Line */}
                 {!isLast && (
                   <div
                     className={`flex-1 h-0.5 mx-2 -mt-7 ${
@@ -77,7 +67,6 @@ export const InvoiceTimeline = ({ timeline = [] }) => {
           })}
         </div>
 
-        {/* Mobile Vertical Stepper */}
         <div className="sm:hidden space-y-4">
           {timeline.map((stage, idx) => {
             const isCompleted = stage.status === 'completed';

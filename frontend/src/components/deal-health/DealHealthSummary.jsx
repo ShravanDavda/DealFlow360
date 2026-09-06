@@ -1,13 +1,6 @@
 import React from 'react';
 import { Clock, AlertTriangle, Truck } from 'lucide-react';
 
-/**
- * DealHealthSummary - Renders the three deal health metric cards:
- * Stalled Deals, Discount Anomalies, and Delivery Slippage.
- * 
- * @param {Object} props
- * @param {Object} props.summary - { stalledDeals, discountAnomalies, deliverySlippage }
- */
 export const DealHealthSummary = ({ 
   summary = {
     stalledDeals: 5,

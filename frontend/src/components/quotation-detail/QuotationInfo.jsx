@@ -1,18 +1,10 @@
 import React from 'react';
 import { User, Tag } from 'lucide-react';
 
-/**
- * QuotationInfo - Displays the Customer and Price List details.
- * 
- * @param {Object} props
- * @param {string} props.customerName - Name of the customer
- * @param {string} props.priceList - Active price list name
- */
 export const QuotationInfo = ({ customerName, priceList }) => {
   return (
     <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        {/* Customer Field */}
         <div>
           <label 
             htmlFor="customer-name" 
@@ -34,7 +26,6 @@ export const QuotationInfo = ({ customerName, priceList }) => {
           </div>
         </div>
 
-        {/* Price List Field */}
         <div>
           <label 
             htmlFor="price-list" 

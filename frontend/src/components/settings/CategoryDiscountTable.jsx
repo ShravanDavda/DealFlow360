@@ -1,14 +1,6 @@
 import React from 'react';
 import { Percent, FolderTree } from 'lucide-react';
 
-/**
- * CategoryDiscountTable - Editable table for product category discount ceilings (Hardware, Services).
- * 
- * @param {Object} props
- * @param {Array<Object>} props.categories - Array of category objects { id, name, maxDiscountPercent }
- * @param {Function} props.onChange - Callback (id, newPercent) => void
- * @param {Object} props.errors - Validation errors keyed by category id
- */
 export const CategoryDiscountTable = ({ categories = [], onChange, errors = {} }) => {
   return (
     <div className="space-y-3">

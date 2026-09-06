@@ -1,91 +1,118 @@
-import React, { useState } from 'react';
-import { CheckCircle2, ShieldAlert, BellRing, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { CheckCircle2, ShieldAlert, BellRing, AlertTriangle, RefreshCw } from 'lucide-react';
 import { DashboardNavbar } from '../components/dashboard/DashboardNavbar';
 import { DealHealthSummary } from '../components/deal-health/DealHealthSummary';
 import { AnomalyTable } from '../components/deal-health/AnomalyTable';
 import { Button } from '../components/ui/Button';
-
-// ============================================================================
-// FRONTEND MOCK DATA & FUTURE BACKEND API CONTRACT
-// ============================================================================
-// API 1: GET /api/deal-health
-//   Returns { summary: { stalledDeals: 5, discountAnomalies: 2, deliverySlippage: 3 }, anomalies: [ ... ] }
-// API 2: POST /api/deal-health/:dealId/escalate
-//   Request: { reason: string }
-//   Response: { success: true, message: "Deal escalation initiated", data: { dealId, status: "ESCALATED" } }
-// API 3: POST /api/deal-health/:dealId/nudge
-//   Request: { message: string }
-//   Response: { success: true, message: "Rep nudge sent", data: { dealId, status: "NUDGED" } }
-// ============================================================================
-const MOCK_DEAL_HEALTH = {
-  summary: {
-    stalledDeals: 5,
-    discountAnomalies: 2,
-    deliverySlippage: 3,
-  },
-  anomalies: [
-    {
-      id: 'DH-001',
-      dealId: 'Q-1030',
-      deal: 'Zenith Co',
-      issue: 'Idle 9 days',
-      flaggedDate: 'Aug 24',
-      action: 'Nudge sent',
-    },
-    {
-      id: 'DH-002',
-      dealId: 'Q-1035',
-      deal: 'Delta LLC',
-      issue: 'Discount 22% vs avg 8%',
-      flaggedDate: 'Aug 25',
-      action: 'Escalated to Manager',
-    },
-  ],
-};
+import { getDealHealth, escalateDeal, nudgeRep } from '../services/dealHealthService';
 
 export const DealHealth = () => {
-  const [data] = useState(MOCK_DEAL_HEALTH);
+  const navigate = useNavigate();
+  const [data, setData] = useState({
+    summary: { stalledDeals: 0, discountAnomalies: 0, deliverySlippage: 0 },
+    anomalies: []
+  });
   const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleEscalate = () => {
-    setFeedbackMessage('Deal escalation initiated.');
-    setTimeout(() => setFeedbackMessage(''), 4500);
+  const fetchHealthData = async () => {
+    try {
+      setIsLoading(true);
+      const res = await getDealHealth();
+      if (res) setData(res);
+    } catch (err) {
+      console.error('Failed to load deal health data:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleNudgeRep = () => {
-    setFeedbackMessage('Rep nudge sent.');
-    setTimeout(() => setFeedbackMessage(''), 4500);
+  useEffect(() => {
+    fetchHealthData();
+  }, []);
+
+  const handleEscalate = async () => {
+    const firstAnomaly = data.anomalies[0];
+    if (!firstAnomaly?.dealId) {
+      setFeedbackMessage('No flagged deal anomalies available to escalate.');
+      setTimeout(() => setFeedbackMessage(''), 4500);
+      return;
+    }
+    const targetId = firstAnomaly.dealId;
+    try {
+      await escalateDeal(targetId, {
+        reason: 'Escalated to Sales Manager for margin justification'
+      });
+      setFeedbackMessage(`Deal ${targetId} escalated to Sales Manager for margin review.`);
+      setTimeout(() => setFeedbackMessage(''), 4500);
+      await fetchHealthData();
+    } catch (err) {
+      console.error('Failed to escalate deal:', err);
+    }
+  };
+
+  const handleNudgeRep = async () => {
+    const firstAnomaly = data.anomalies[0];
+    if (!firstAnomaly?.dealId) {
+      setFeedbackMessage('No flagged deal anomalies available to nudge.');
+      setTimeout(() => setFeedbackMessage(''), 4500);
+      return;
+    }
+    const targetId = firstAnomaly.dealId;
+    try {
+      await nudgeRep(targetId, {
+        message: 'Automated notification sent to account executive to update stalled quotation'
+      });
+      setFeedbackMessage(`Automated nudge alert sent to rep for deal ${targetId}.`);
+      setTimeout(() => setFeedbackMessage(''), 4500);
+      await fetchHealthData();
+    } catch (err) {
+      console.error('Failed to nudge rep:', err);
+    }
+  };
+
+  const handleRowClick = (anomaly) => {
+    if (anomaly.dealId) {
+      navigate(`/quotations/${anomaly.dealId}`);
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* 1. Top Navigation - Reusing DealFlow360 Internal Navbar */}
       <DashboardNavbar />
 
-      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
-        {/* 2. Page Header */}
-        <div className="space-y-1">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-md bg-slate-900 text-white shadow-sm">
-              <ShieldAlert className="h-5 w-5" />
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-md bg-slate-900 text-white shadow-sm">
+                <ShieldAlert className="h-5 w-5" />
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                Deal Health & Anomaly Dashboard
+              </h1>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Deal Health and Anomaly Dashboard
-            </h1>
+            <p className="text-sm text-slate-600">
+              Real-time governance flags for stalled deals, discount anomalies, and delivery slippages.
+            </p>
           </div>
-          <p className="text-sm text-slate-600">
-            Real-time flags for stalled deals and unusual discount patterns
-          </p>
+
+          <button
+            type="button"
+            onClick={fetchHealthData}
+            className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 bg-white px-3 py-1.5 rounded-md border border-slate-200 shadow-sm"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
+            <span>Refresh Flags</span>
+          </button>
         </div>
 
-        {/* Global Feedback Banner */}
         {feedbackMessage && (
           <div 
             className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center gap-3 shadow-sm transition-all animate-in fade-in"
             role="status"
-            aria-live="polite"
           >
             <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
             <span className="text-sm font-semibold text-emerald-900">
@@ -94,26 +121,26 @@ export const DealHealth = () => {
           </div>
         )}
 
-        {/* 3. Summary Cards */}
         <section aria-label="Deal Health Summary Metrics">
           <DealHealthSummary summary={data.summary} />
         </section>
 
-        {/* 4. Anomaly Table Section */}
         <section aria-label="Flagged Deals Table" className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-slate-900">
-              Flagged Deals & Anomalies
+              Flagged Deals & Anomalies ({data.anomalies.length})
             </h2>
             <span className="text-xs text-slate-500 font-medium">
-              {data.anomalies.length} deals requiring attention
+              Click any deal alert to open its quotation directly
             </span>
           </div>
 
-          <AnomalyTable anomalies={data.anomalies} />
+          <AnomalyTable 
+            anomalies={data.anomalies} 
+            onRowClick={handleRowClick}
+          />
         </section>
 
-        {/* 5. Bottom Action Buttons */}
         <section 
           aria-label="Deal Health Actions" 
           className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-start gap-3"
@@ -124,7 +151,7 @@ export const DealHealth = () => {
             className="inline-flex items-center justify-center rounded-md font-medium text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 bg-rose-600 text-white hover:bg-rose-700 h-10 px-5 shadow-sm gap-2"
           >
             <AlertTriangle className="h-4 w-4" />
-            <span>Escalate</span>
+            <span>Escalate Selected</span>
           </button>
 
           <Button

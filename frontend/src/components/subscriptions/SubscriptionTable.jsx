@@ -6,13 +6,6 @@ const STATUS_BADGES = {
   Cancelled: 'bg-rose-50 text-rose-700 border-rose-200',
 };
 
-/**
- * SubscriptionTable - Displays recurring customer subscription plans in a responsive table.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.subscriptions - Array of subscription records
- * @param {Function} props.onRowClick - Row selection callback
- */
 export const SubscriptionTable = ({ subscriptions = [], onRowClick }) => {
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">

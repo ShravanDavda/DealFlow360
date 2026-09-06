@@ -1,12 +1,6 @@
 import React from 'react';
 import { ShoppingBag } from 'lucide-react';
 
-/**
- * BillingOneTimeTable - Displays one-time order lines originating from the order.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.lines - Array of one-time order line items
- */
 export const BillingOneTimeTable = ({ lines = [] }) => {
   const formatAmount = (amount) =>
     new Intl.NumberFormat('en-US', {

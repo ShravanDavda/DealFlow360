@@ -1,12 +1,6 @@
 import React from 'react';
 import { Package } from 'lucide-react';
 
-/**
- * StockTable - Displays live warehouse stock levels with reserved and available quantities.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.stockData - Array of stock records
- */
 export const StockTable = ({ stockData = [] }) => {
   return (
     <div className="space-y-3">

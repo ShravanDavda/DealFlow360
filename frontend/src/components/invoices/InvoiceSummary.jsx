@@ -1,16 +1,9 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-/**
- * InvoiceSummary - Displays summary status indicators for unpaid and paid invoices.
- * 
- * @param {Object} props
- * @param {Object} props.summary - { unpaid: number, paid: number }
- */
 export const InvoiceSummary = ({ summary = { unpaid: 4, paid: 21 } }) => {
   return (
     <div className="flex flex-wrap items-center gap-3">
-      {/* Unpaid Invoices Indicator */}
       <div 
         className="inline-flex items-center gap-2.5 px-4 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 shadow-sm"
         aria-label={`${summary.unpaid} Unpaid Invoices`}
@@ -22,7 +15,6 @@ export const InvoiceSummary = ({ summary = { unpaid: 4, paid: 21 } }) => {
         </span>
       </div>
 
-      {/* Paid Invoices Indicator */}
       <div 
         className="inline-flex items-center gap-2.5 px-4 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 shadow-sm"
         aria-label={`${summary.paid} Paid Invoices`}

@@ -1,9 +1,6 @@
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
 
-/**
- * FulfillmentDetailNotice - Displays the automated consolidation notice below the split table.
- */
 export const FulfillmentDetailNotice = () => {
   return (
     <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-3">

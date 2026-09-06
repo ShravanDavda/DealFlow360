@@ -1,12 +1,6 @@
 import React from 'react';
 import { CalendarClock } from 'lucide-react';
 
-/**
- * BillingRecurringTable - Displays recurring subscription plans with billing cycle and amounts.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.lines - Array of recurring plan line items
- */
 export const BillingRecurringTable = ({ lines = [] }) => {
   const formatAmount = (amount) =>
     new Intl.NumberFormat('en-US', {

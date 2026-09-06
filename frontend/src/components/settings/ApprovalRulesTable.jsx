@@ -1,12 +1,6 @@
 import React from 'react';
 import { GitFork, ArrowRight, ShieldCheck, UserCheck, Users } from 'lucide-react';
 
-/**
- * ApprovalRulesTable - Displays the approval chain routing rules based on discount ranges and blended risk.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.rules - List of rules { id, discountRange, approvalChain }
- */
 export const ApprovalRulesTable = ({ rules = [] }) => {
   const getBadgeStyle = (chainText) => {
     const text = chainText.toLowerCase();

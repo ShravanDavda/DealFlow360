@@ -1,13 +1,5 @@
 import React from 'react';
 
-/**
- * QuotationCard - Renders an individual quotation card in the Kanban column.
- * Accessible, clickable, and styled consistently with DealFlow360 card design.
- * 
- * @param {Object} props
- * @param {Object} props.quotation - { id, customerName, amount, status }
- * @param {Function} props.onClick - Click handler navigating to quotation detail
- */
 export const QuotationCard = ({ quotation, onClick }) => {
   const formattedAmount = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -34,6 +26,12 @@ export const QuotationCard = ({ quotation, onClick }) => {
         <span className="text-base font-bold text-slate-800 tracking-tight">
           {formattedAmount}
         </span>
+        <span className={`text-xs font-semibold ${quotation.blendedRisk === 'HIGH' ? 'text-rose-700' : 'text-slate-500'}`}>
+          {quotation.blendedRisk || 'LOW'}
+        </span>
+      </div>
+      <div className="mt-2 text-xs text-slate-500">
+        Updated {quotation.updatedAt ? new Date(quotation.updatedAt).toLocaleDateString() : '--'}
       </div>
     </button>
   );

@@ -6,12 +6,6 @@ const STATUS_BADGES = {
   Unpaid: 'bg-amber-50 text-amber-700 border-amber-200',
 };
 
-/**
- * RelatedInvoicesTable - Displays related invoice items for an order/billing relationship.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.invoices - List of related invoices { invoiceId, type, amount, status, dueDate }
- */
 export const RelatedInvoicesTable = ({ invoices = [] }) => {
   const formatCurrency = (amount, currency = 'USD') =>
     new Intl.NumberFormat('en-US', {

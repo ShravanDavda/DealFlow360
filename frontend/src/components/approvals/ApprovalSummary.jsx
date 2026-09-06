@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { Clock, RotateCcw, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 const STATUS_CONFIG = {
   pending: {
@@ -14,17 +14,15 @@ const STATUS_CONFIG = {
     badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
     icon: <CheckCircle2 className="h-4 w-4 text-emerald-600" />,
   },
+  'high-risk': {
+    badgeClass: 'bg-rose-50 text-rose-800 border-rose-200',
+    icon: <AlertTriangle className="h-4 w-4 text-rose-600" />,
+  },
 };
 
-/**
- * ApprovalSummary - Renders status summary indicator cards.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.summary - Array of summary indicators { label, count, status }
- */
 export const ApprovalSummary = ({ summary = [] }) => {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {summary.map((item) => {
         const config = STATUS_CONFIG[item.status.toLowerCase()] || {
           badgeClass: 'bg-slate-50 text-slate-800 border-slate-200',
@@ -40,9 +38,8 @@ export const ApprovalSummary = ({ summary = [] }) => {
               <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                 {item.label}
               </p>
-              <p className="text-2xl font-bold tracking-tight text-slate-900 mt-1">
-                {item.count} {item.label}
-              </p>
+              <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{item.count}</p>
+              <p className="mt-1 text-xs text-slate-500">{item.status === 'pending' ? 'Awaiting Manager review' : item.status === 'high-risk' ? 'Requires Manager → Finance handoff' : item.status === 'returned' ? 'With Sales Rep for rework' : 'Authorized for deal creation'}</p>
             </div>
             <div className={`p-2 rounded-lg border ${config.badgeClass}`}>
               {config.icon}

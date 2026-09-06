@@ -7,19 +7,11 @@ const RISK_BADGES = {
   LOW: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
-/**
- * ApprovalRiskSummary - Displays Blended Risk and Customer Tier indicators.
- * 
- * @param {Object} props
- * @param {string} props.blendedRisk - Risk level (e.g. 'HIGH')
- * @param {string} props.customerTier - Customer tier (e.g. 'Gold')
- */
 export const ApprovalRiskSummary = ({ blendedRisk = 'HIGH', customerTier = 'Gold' }) => {
   const riskClass = RISK_BADGES[blendedRisk] || 'bg-slate-50 text-slate-700 border-slate-200';
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {/* Blended Risk Indicator */}
       <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between">
         <div>
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
@@ -37,7 +29,6 @@ export const ApprovalRiskSummary = ({ blendedRisk = 'HIGH', customerTier = 'Gold
         </div>
       </div>
 
-      {/* Customer Tier Indicator */}
       <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between">
         <div>
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">

@@ -1,15 +1,6 @@
 import React from 'react';
 import { Filter } from 'lucide-react';
 
-/**
- * ReportFilters - Renders the horizontal 4-field filter controls for the reporting dashboard:
- * Period, Sales Team, Approval Status, Product.
- * 
- * @param {Object} props
- * @param {Object} props.filters - Current filter values { period, salesTeam, approvalStatus, product }
- * @param {Object} props.options - Available filter options { periods, salesTeams, approvalStatuses, products }
- * @param {Function} props.onFilterChange - Callback when any filter changes: (field, value) => void
- */
 export const ReportFilters = ({
   filters = {
     period: 'This Month',
@@ -21,7 +12,7 @@ export const ReportFilters = ({
     periods: ['This Month', 'Last Month', 'This Quarter'],
     salesTeams: ['All Teams', 'Enterprise', 'SMB'],
     approvalStatuses: ['All', 'Pending', 'Approved', 'Returned'],
-    products: ['All Products', 'Laptop Pro 14', 'Care Plan 2yr', 'Support SLA'],
+    products: ['All Products'],
   },
   onFilterChange,
 }) => {
@@ -41,7 +32,6 @@ export const ReportFilters = ({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Field 1: Period */}
         <div className="space-y-1.5">
           <label 
             htmlFor="filter-period" 
@@ -63,7 +53,6 @@ export const ReportFilters = ({
           </select>
         </div>
 
-        {/* Field 2: Sales Team */}
         <div className="space-y-1.5">
           <label 
             htmlFor="filter-sales-team" 
@@ -85,7 +74,6 @@ export const ReportFilters = ({
           </select>
         </div>
 
-        {/* Field 3: Approval Status */}
         <div className="space-y-1.5">
           <label 
             htmlFor="filter-approval-status" 
@@ -107,7 +95,6 @@ export const ReportFilters = ({
           </select>
         </div>
 
-        {/* Field 4: Product */}
         <div className="space-y-1.5">
           <label 
             htmlFor="filter-product" 

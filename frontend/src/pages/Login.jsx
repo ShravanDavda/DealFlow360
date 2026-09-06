@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Mail, 
   Eye, 
@@ -13,7 +13,8 @@ import { Button } from '../components/ui/Button';
 import { loginUser } from '../services/authService';
 
 export const Login = () => {
-  // Form states
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -25,7 +26,6 @@ export const Login = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Client-side validation
   const validateForm = () => {
     const newErrors = {};
 
@@ -50,7 +50,6 @@ export const Login = () => {
       [name]: value,
     }));
 
-    // Clear individual field errors on change
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
@@ -77,13 +76,24 @@ export const Login = () => {
         password: formData.password,
       });
 
-      // Store JWT token if provided by the backend response
       const token = response?.token || response?.data?.token;
       if (token) {
         localStorage.setItem('token', token);
       }
 
-      setSuccessMessage(response?.message || 'Logged in successfully!');
+      const userRole = response?.data?.user?.role;
+      navigate(
+        userRole === 'admin' 
+          ? '/admin-dashboard' 
+          : userRole === 'sales_rep' 
+          ? '/sales-rep-dashboard' 
+          : userRole === 'sales_manager' 
+          ? '/sales-manager-dashboard' 
+          : userRole === 'customer'
+          ? '/customer/quotes'
+          : '/dashboard', 
+        { replace: true }
+      );
     } catch (err) {
       setServerError(err.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -94,7 +104,6 @@ export const Login = () => {
   return (
     <div className="min-h-screen flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-50">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Brand header */}
         <div className="flex justify-center">
           <div className="h-11 w-11 rounded-lg bg-slate-900 flex items-center justify-center text-white shadow-md">
             <ShieldCheck className="h-6 w-6" />
@@ -111,7 +120,6 @@ export const Login = () => {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-6 shadow-sm border border-slate-200 rounded-lg sm:px-10">
           
-          {/* Server Error Alert */}
           {serverError && (
             <div className="mb-5 p-3.5 rounded-md bg-red-50 border border-red-200 flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
@@ -121,7 +129,6 @@ export const Login = () => {
             </div>
           )}
 
-          {/* Success Alert */}
           {successMessage && (
             <div className="mb-5 p-3.5 rounded-md bg-emerald-50 border border-emerald-200 flex items-start gap-3">
               <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
@@ -133,7 +140,6 @@ export const Login = () => {
 
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             
-            {/* Email Field */}
             <div>
               <div className="relative">
                 <Input
@@ -154,7 +160,6 @@ export const Login = () => {
               </div>
             </div>
 
-            {/* Password Field */}
             <div>
               <div className="relative">
                 <Input
@@ -184,7 +189,6 @@ export const Login = () => {
               </div>
             </div>
 
-            {/* Submit Button */}
             <div className="pt-1">
               <Button
                 type="submit"
@@ -196,15 +200,25 @@ export const Login = () => {
             </div>
           </form>
 
-          {/* Switch to Register link */}
-          <div className="mt-6 text-center text-sm text-slate-600 border-t border-slate-100 pt-5">
-            Don't have an account?{' '}
-            <Link 
-              to="/register" 
-              className="font-medium text-slate-900 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-900 rounded"
-            >
-              Sign up
-            </Link>
+          <div className="mt-6 text-center text-sm text-slate-600 border-t border-slate-100 pt-5 space-y-2">
+            <div>
+              Don't have an account?{' '}
+              <Link 
+                to="/register" 
+                className="font-medium text-slate-900 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-900 rounded"
+              >
+                Sign up
+              </Link>
+            </div>
+            <div>
+              Customer with an activation code?{' '}
+              <Link 
+                to="/activate" 
+                className="font-medium text-indigo-600 hover:text-indigo-800 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-600 rounded"
+              >
+                Activate your account
+              </Link>
+            </div>
           </div>
         </div>
       </div>

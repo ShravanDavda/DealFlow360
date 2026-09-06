@@ -1,14 +1,6 @@
 import React from 'react';
 import { Percent, Shield } from 'lucide-react';
 
-/**
- * TierDiscountTable - Editable table for customer tier discount ceilings (Bronze, Silver, Gold).
- * 
- * @param {Object} props
- * @param {Array<Object>} props.tiers - Array of tier objects { id, name, maxDiscountPercent }
- * @param {Function} props.onChange - Callback (id, newPercent) => void
- * @param {Object} props.errors - Validation errors keyed by tier id
- */
 export const TierDiscountTable = ({ tiers = [], onChange, errors = {} }) => {
   return (
     <div className="space-y-3">

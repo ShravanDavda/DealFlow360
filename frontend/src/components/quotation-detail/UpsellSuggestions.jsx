@@ -1,14 +1,6 @@
 import React from 'react';
 import { Plus, Check, Sparkles } from 'lucide-react';
 
-/**
- * UpsellSuggestions - Displays recommendations for upselling and cross-selling.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.suggestions - List of suggestion items
- * @param {Array<string>} props.selectedIds - List of currently selected suggestion IDs
- * @param {Function} props.onToggleSuggestion - Callback when a suggestion is clicked
- */
 export const UpsellSuggestions = ({
   suggestions = [],
   selectedIds = [],

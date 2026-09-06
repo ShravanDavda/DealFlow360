@@ -1,160 +1,123 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { DashboardNavbar } from '../components/dashboard/DashboardNavbar';
 import { ApprovalRiskSummary } from '../components/approval-detail/ApprovalRiskSummary';
 import { ApprovalRiskTable } from '../components/approval-detail/ApprovalRiskTable';
 import { ApprovalTimeline } from '../components/approval-detail/ApprovalTimeline';
 import { ApprovalAuditTrail } from '../components/approval-detail/ApprovalAuditTrail';
 import { Button } from '../components/ui/Button';
-
-// ============================================================================
-// FRONTEND MOCK DATA & FUTURE BACKEND API CONTRACT
-// ============================================================================
-// Endpoint: GET /api/approvals/:approvalId
-// Approve: POST /api/approvals/:approvalId/approve
-// Return: POST /api/approvals/:approvalId/return
-// Reject: POST /api/approvals/:approvalId/reject
-// ============================================================================
-const MOCK_APPROVAL_LOOKUP = {
-  'A-001': {
-    id: 'A-001',
-    quotationId: 'Q-1042',
-    customerName: 'Acme Corp',
-    blendedRisk: 'HIGH',
-    customerTier: 'Gold',
-  },
-  'Q-1042': {
-    id: 'A-001',
-    quotationId: 'Q-1042',
-    customerName: 'Acme Corp',
-    blendedRisk: 'HIGH',
-    customerTier: 'Gold',
-  },
-  'A-002': {
-    id: 'A-002',
-    quotationId: 'Q-1039',
-    customerName: 'Beta Industries',
-    blendedRisk: 'MEDIUM',
-    customerTier: 'Silver',
-  },
-  'Q-1039': {
-    id: 'A-002',
-    quotationId: 'Q-1039',
-    customerName: 'Beta Industries',
-    blendedRisk: 'MEDIUM',
-    customerTier: 'Silver',
-  },
-  'A-003': {
-    id: 'A-003',
-    quotationId: 'Q-1035',
-    customerName: 'Nova Retail',
-    blendedRisk: 'LOW',
-    customerTier: 'Standard',
-  },
-  'Q-1035': {
-    id: 'A-003',
-    quotationId: 'Q-1035',
-    customerName: 'Nova Retail',
-    blendedRisk: 'LOW',
-    customerTier: 'Standard',
-  },
-};
-
-const DEFAULT_RISK_LINES = [
-  {
-    id: 'RL-001',
-    line: 'Laptop (Hardware)',
-    discountGiven: 12,
-    limitAllowed: 15,
-    overBy: 0,
-    status: 'OK',
-  },
-  {
-    id: 'RL-002',
-    line: 'Setup Service (Services)',
-    discountGiven: 18,
-    limitAllowed: 10,
-    overBy: 8,
-    status: 'OVER',
-  },
-];
-
-const DEFAULT_WORKFLOW = [
-  {
-    id: 'submitted',
-    label: 'Submitted',
-    status: 'completed',
-  },
-  {
-    id: 'sales-manager',
-    label: 'Sales Manager',
-    status: 'current',
-  },
-  {
-    id: 'finance',
-    label: 'Finance',
-    status: 'upcoming',
-  },
-  {
-    id: 'confirmed',
-    label: 'Confirmed',
-    status: 'upcoming',
-  },
-];
-
-const DEFAULT_AUDIT_TRAIL = [
-  {
-    id: 'AUD-001',
-    user: 'J. Rao',
-    action: 'Submitted',
-    date: 'Aug 20',
-    note: 'Initial 12% discount',
-  },
-  {
-    id: 'AUD-002',
-    user: 'M. Shah',
-    action: 'Returned',
-    date: 'Aug 21',
-    note: 'Requested justification',
-  },
-  {
-    id: 'AUD-003',
-    user: 'J. Rao',
-    action: 'Resubmitted',
-    date: 'Aug 22',
-    note: 'Added margin note',
-  },
-];
+import { getCurrentUser } from '../services/authService';
+import {
+  getApprovalDetail,
+  approveQuotation,
+  rejectQuotation,
+  returnForRevision,
+} from '../services/approvalService';
 
 export const ApprovalDetail = () => {
-  const { approvalId = 'A-001' } = useParams();
+  const { approvalId } = useParams();
 
-  // Look up approval details dynamically based on URL parameter
-  const approval = MOCK_APPROVAL_LOOKUP[approvalId] || {
-    id: approvalId,
-    quotationId: approvalId.startsWith('Q-') ? approvalId : 'Q-1042',
-    customerName: 'Acme Corp',
-    blendedRisk: 'HIGH',
-    customerTier: 'Gold',
-  };
-
+  const [approval, setApproval] = useState(null);
   const [actionMessage, setActionMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [userRole, setUserRole] = useState(null);
 
-  const handleAction = (actionName) => {
-    setActionMessage(`Approval action recorded: ${actionName}`);
-    setTimeout(() => setActionMessage(''), 4500);
+  const fetchDetail = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getApprovalDetail(approvalId);
+      if (data) setApproval(data);
+    } catch (err) {
+      console.error('Failed to load approval details:', err);
+      setErrorMessage('Could not load approval record from server.');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  useEffect(() => {
+    fetchDetail();
+    getCurrentUser().then((response) => setUserRole(response?.data?.role || null)).catch(() => setUserRole(null));
+  }, [approvalId]);
+
+  const currentStep = String(approval?.approval?.steps?.find((step) => step.status === 'PENDING')?.approverRole || approval?.currentStep || approval?.approvalStage || '').toLowerCase();
+  const canAct = approval?.status === 'Pending' && ((userRole === 'sales_manager' && currentStep === 'sales manager') || (['finance', 'operations'].includes(userRole) && currentStep === 'finance'));
+
+  const handleApprove = async () => {
+    try {
+      setIsProcessing(true);
+      const res = await approveQuotation(approvalId, {
+        note: 'Approved discount terms within authority'
+      });
+      if (res) setApproval(res);
+      setActionMessage('Quotation approved successfully! Status updated.');
+      setTimeout(() => setActionMessage(''), 4500);
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to approve quotation.');
+      setTimeout(() => setErrorMessage(''), 4500);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleReject = async () => {
+    try {
+      setIsProcessing(true);
+      const res = await rejectQuotation(approvalId, {
+        reason: 'Discount exceeds policy threshold without margin justification'
+      });
+      if (res) setApproval(res);
+      setActionMessage('Quotation has been rejected.');
+      setTimeout(() => setActionMessage(''), 4500);
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to reject quotation.');
+      setTimeout(() => setErrorMessage(''), 4500);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleReturn = async () => {
+    try {
+      setIsProcessing(true);
+      const res = await returnForRevision(approvalId, {
+        note: 'Returned to sales rep for line discount reduction'
+      });
+      if (res) setApproval(res);
+      setActionMessage('Quotation returned to sales rep for revision.');
+      setTimeout(() => setActionMessage(''), 4500);
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to return quotation.');
+      setTimeout(() => setErrorMessage(''), 4500);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (isLoading && !approval) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <DashboardNavbar />
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-16 text-center text-slate-600 font-medium">
+          Loading approval details...
+        </main>
+      </div>
+    );
+  }
+
+  const riskLines = approval?.riskLines || [];
+  const workflow = approval?.workflow || [];
+  const auditTrail = approval?.auditTrail || [];
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* 1. Top Navigation */}
       <DashboardNavbar />
 
-      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         
-        {/* Navigation Breadcrumb / Back Link */}
         <div>
           <Link
             to="/approvals"
@@ -165,55 +128,69 @@ export const ApprovalDetail = () => {
           </Link>
         </div>
 
-        {/* 2. Page Header */}
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Approval Detail: {approval.quotationId} ({approval.customerName})
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Opened by clicking a row on the Approvals list
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              Approval Detail: {approval?.quotationId} ({approval?.customerName})
+            </h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Blended risk analysis and governance review for requested discounts.
+            </p>
+          </div>
+
+          <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
+            approval?.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+            approval?.status === 'Pending' || approval?.status === 'Pending Approval' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+            approval?.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+            'bg-slate-100 text-slate-700 border-slate-200'
+          }`}>
+            Stage: {approval?.approvalStage || approval?.stage || 'Review'}
+          </span>
         </div>
 
-        {/* Action Confirmation Banner */}
         {actionMessage && (
-          <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center gap-3">
+          <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center gap-3 animate-in fade-in">
             <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-            <span className="text-sm font-medium text-emerald-800">
+            <span className="text-sm font-semibold text-emerald-900">
               {actionMessage}
             </span>
           </div>
         )}
 
-        {/* 3. Risk Summary (Blended Risk & Customer Tier) */}
+        {errorMessage && (
+          <div className="p-4 rounded-lg bg-rose-50 border border-rose-200 flex items-center gap-3 animate-in fade-in">
+            <ShieldAlert className="h-5 w-5 text-rose-600 shrink-0" />
+            <span className="text-sm font-semibold text-rose-900">
+              {errorMessage}
+            </span>
+          </div>
+        )}
+
         <section aria-label="Risk Summary">
           <ApprovalRiskSummary
-            blendedRisk={approval.blendedRisk}
-            customerTier={approval.customerTier}
+            blendedRisk={approval?.blendedRisk || 'LOW'}
+            customerTier={approval?.customerTier || 'Gold'}
           />
         </section>
 
-        {/* 4. Why This Quote Was Flagged & Risk Table */}
         <section aria-label="Risk Breakdown">
-          <ApprovalRiskTable riskLines={DEFAULT_RISK_LINES} />
+          <ApprovalRiskTable riskLines={riskLines} />
         </section>
 
-        {/* 5. Approval Workflow Stepper */}
         <section aria-label="Approval Workflow">
-          <ApprovalTimeline workflow={DEFAULT_WORKFLOW} />
+          <ApprovalTimeline workflow={workflow} />
         </section>
 
-        {/* 6. Audit Trail */}
         <section aria-label="Audit Trail">
-          <ApprovalAuditTrail auditTrail={DEFAULT_AUDIT_TRAIL} />
+          <ApprovalAuditTrail auditTrail={auditTrail} />
         </section>
 
-        {/* 7. Bottom Actions */}
-        <section aria-label="Approval Actions" className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
+        {canAct && <section aria-label="Approval Actions" className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
           <button
             type="button"
-            onClick={() => handleAction('Reject')}
-            className="inline-flex items-center justify-center rounded-md font-medium text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 bg-rose-600 text-white hover:bg-rose-700 h-10 px-5 shadow-sm"
+            disabled={isProcessing}
+            onClick={handleReject}
+            className="inline-flex items-center justify-center rounded-md font-medium text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 bg-rose-600 text-white hover:bg-rose-700 h-10 px-5 shadow-sm disabled:opacity-60"
           >
             Reject
           </button>
@@ -221,7 +198,8 @@ export const ApprovalDetail = () => {
           <Button
             type="button"
             variant="secondary"
-            onClick={() => handleAction('Return for Revision')}
+            disabled={isProcessing}
+            onClick={handleReturn}
             className="sm:!w-auto px-5"
           >
             Return for Revision
@@ -230,12 +208,13 @@ export const ApprovalDetail = () => {
           <Button
             type="button"
             variant="primary"
-            onClick={() => handleAction('Approve')}
+            disabled={isProcessing}
+            onClick={handleApprove}
             className="sm:!w-auto px-5"
           >
             Approve
           </Button>
-        </section>
+        </section>}
 
       </main>
     </div>

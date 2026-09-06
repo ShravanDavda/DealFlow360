@@ -1,13 +1,6 @@
 import React from 'react';
 import { Package, Layers, Tag } from 'lucide-react';
 
-/**
- * ProductSummary - Displays summary metric cards for the Product Catalog:
- * Total Products, Pricelists, and Variants.
- * 
- * @param {Object} props
- * @param {Object} props.summary - { totalProducts, archivedProducts, priceLists, currencies, variants }
- */
 export const ProductSummary = ({
   summary = {
     totalProducts: 128,

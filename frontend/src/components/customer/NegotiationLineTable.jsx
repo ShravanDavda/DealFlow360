@@ -1,17 +1,6 @@
 import React from 'react';
 import { MessageSquareText } from 'lucide-react';
 
-/**
- * NegotiationLineTable - Displays quotation line items and customer negotiation comments.
- * 
- * STRICT CUSTOMER VISIBILITY:
- * Only product names and customer comments are exposed.
- * Internal fields (margin, risk, approval chain, discount limits, warehouse split)
- * are strictly prohibited from rendering in this component.
- * 
- * @param {Object} props
- * @param {Array<{ id: string, productName: string, customerComment: string }>} props.lines
- */
 export const NegotiationLineTable = ({ lines = [] }) => {
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">

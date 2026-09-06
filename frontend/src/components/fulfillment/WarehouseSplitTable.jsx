@@ -1,12 +1,6 @@
 import React from 'react';
 import { Layers } from 'lucide-react';
 
-/**
- * WarehouseSplitTable - Displays warehouse fulfillment splits with quantities, estimated shipments, and costs.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.warehouseSplits - Array of split allocations
- */
 export const WarehouseSplitTable = ({ warehouseSplits = [] }) => {
   const formatCost = (amount) =>
     new Intl.NumberFormat('en-US', {

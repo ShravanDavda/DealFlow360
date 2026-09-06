@@ -14,10 +14,10 @@ import { Button } from '../components/ui/Button';
 import { registerUser } from '../services/authService';
 
 export const Register = () => {
-  // Form states
   const [formData, setFormData] = useState({
     username: '',
     email: '',
+    role: '',
     password: '',
   });
 
@@ -27,7 +27,6 @@ export const Register = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Client-side validation
   const validateForm = () => {
     const newErrors = {};
 
@@ -41,6 +40,10 @@ export const Register = () => {
       newErrors.email = 'Email address is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
+    }
+
+    if (!formData.role) {
+      newErrors.role = 'Role is required';
     }
 
     if (!formData.password) {
@@ -60,7 +63,6 @@ export const Register = () => {
       [name]: value,
     }));
 
-    // Clear individual field errors on change
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
@@ -85,13 +87,12 @@ export const Register = () => {
       const response = await registerUser({
         username: formData.username.trim(),
         email: formData.email.trim(),
+        role: formData.role,
         password: formData.password,
       });
 
-      setSuccessMessage(response?.message || 'Account created successfully!');
-      
-      // Clear form
-      setFormData({ username: '', email: '', password: '' });
+      setSuccessMessage('Registration submitted. An administrator must approve your requested role before you can sign in.');
+      setFormData({ username: '', email: '', role: '', password: '' });
     } catch (err) {
       setServerError(err.message || 'Registration failed. Please try again.');
     } finally {
@@ -102,7 +103,6 @@ export const Register = () => {
   return (
     <div className="min-h-screen flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-50">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Brand header */}
         <div className="flex justify-center">
           <div className="h-11 w-11 rounded-lg bg-slate-900 flex items-center justify-center text-white shadow-md">
             <ShieldCheck className="h-6 w-6" />
@@ -119,7 +119,6 @@ export const Register = () => {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-6 shadow-sm border border-slate-200 rounded-lg sm:px-10">
           
-          {/* Server Error Alert */}
           {serverError && (
             <div className="mb-5 p-3.5 rounded-md bg-red-50 border border-red-200 flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
@@ -129,7 +128,6 @@ export const Register = () => {
             </div>
           )}
 
-          {/* Success Alert */}
           {successMessage && (
             <div className="mb-5 p-3.5 rounded-md bg-emerald-50 border border-emerald-200 flex items-start gap-3">
               <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
@@ -141,7 +139,6 @@ export const Register = () => {
 
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             
-            {/* Username Field */}
             <div>
               <div className="relative">
                 <Input
@@ -162,7 +159,6 @@ export const Register = () => {
               </div>
             </div>
 
-            {/* Email Field */}
             <div>
               <div className="relative">
                 <Input
@@ -183,7 +179,32 @@ export const Register = () => {
               </div>
             </div>
 
-            {/* Password Field */}
+            <div>
+              <label htmlFor="role" className="block text-sm font-medium text-slate-700">
+                Role
+              </label>
+              <select
+                id="role"
+                name="role"
+                value={formData.role}
+                onChange={handleChange}
+                className={`mt-1.5 w-full rounded-md border bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent ${
+                  errors.role ? 'border-red-500 focus:ring-red-500' : 'border-slate-300 hover:border-slate-400'
+                }`}
+                required
+              >
+                <option value="" disabled>Select a role</option>
+                <option value="sales_rep">Sales representative</option>
+                <option value="finance">Finance/Operator</option>
+                <option value="sales_manager">SalesManager</option>
+              </select>
+              {errors.role && (
+                <p className="mt-1.5 text-xs text-red-600 font-medium">
+                  {errors.role}
+                </p>
+              )}
+            </div>
+
             <div>
               <div className="relative">
                 <Input
@@ -216,7 +237,6 @@ export const Register = () => {
               </p>
             </div>
 
-            {/* Submit Button */}
             <div className="pt-1">
               <Button
                 type="submit"
@@ -228,7 +248,6 @@ export const Register = () => {
             </div>
           </form>
 
-          {/* Switch to Login link */}
           <div className="mt-6 text-center text-sm text-slate-600 border-t border-slate-100 pt-5">
             Already have an account?{' '}
             <Link 

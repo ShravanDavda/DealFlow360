@@ -16,12 +16,6 @@ const STATUS_CONFIG = {
   },
 };
 
-/**
- * SubscriptionSummary - Displays subscription status indicators.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.summary - Array of summary items { label, count, status }
- */
 export const SubscriptionSummary = ({ summary = [] }) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

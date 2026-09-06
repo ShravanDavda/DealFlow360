@@ -1,9 +1,6 @@
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
 
-/**
- * FulfillmentNotice - Displays highlighted guidance message below the fulfillment table.
- */
 export const FulfillmentNotice = () => {
   return (
     <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-3">

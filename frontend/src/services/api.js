@@ -1,14 +1,13 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
+  baseURL: (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, ''),
   headers: {
     'Content-Type': 'application/json',
   },
   timeout: 10000,
 });
 
-// Request interceptor to attach JWT token if present
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -20,7 +19,6 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for unified error formatting
 api.interceptors.response.use(
   (response) => response,
   (error) => {

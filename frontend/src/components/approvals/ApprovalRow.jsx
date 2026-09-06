@@ -6,14 +6,7 @@ const RISK_BADGE_CLASSES = {
   LOW: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
-/**
- * ApprovalRow - Displays a single approval entry in the approval table.
- * 
- * @param {Object} props
- * @param {Object} props.approval - Approval record
- * @param {Function} props.onClick - Navigation callback with quotationId
- */
-export const ApprovalRow = ({ approval, onClick }) => {
+export const ApprovalRow = ({ approval, onClick, onAction, isSalesManager, isFinanceOperations }) => {
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -32,17 +25,16 @@ export const ApprovalRow = ({ approval, onClick }) => {
       aria-label={`Open approval for ${approval.customerName}, quotation ${approval.quotationId}`}
       className="hover:bg-slate-50 focus:bg-slate-50 focus:outline-none cursor-pointer transition-colors"
     >
-      {/* Quotation */}
       <td className="py-4 pl-6 pr-3 font-semibold text-slate-900 font-mono text-sm">
-        {approval.quotationId}
+        <span>{approval.quotationId}</span>
+        <span className="mt-1 block font-sans text-xs font-normal text-slate-500">{new Date(approval.submittedAt || approval.createdAt).toLocaleDateString()}</span>
       </td>
-
-      {/* Customer */}
       <td className="px-3 py-4 font-medium text-slate-900">
-        {approval.customerName}
+        <span>{approval.customerName}</span>
+        <span className="mt-1 block w-fit rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs font-medium text-slate-600">{approval.customerTier || '--'} Tier</span>
       </td>
-
-      {/* Blended Risk */}
+      <td className="px-3 py-4 text-slate-700">{approval.salesRep || '--'}</td>
+      <td className="px-3 py-4 text-slate-700"><span className="font-semibold">${approval.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span><span className="mt-1 block text-xs text-rose-600">-${approval.discount.toLocaleString(undefined, { minimumFractionDigits: 2 })} disc</span></td>
       <td className="px-3 py-4">
         <span
           className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold border tracking-wide ${riskClass}`}
@@ -50,22 +42,11 @@ export const ApprovalRow = ({ approval, onClick }) => {
           {approval.blendedRisk}
         </span>
       </td>
-
-      {/* Stage */}
-      <td className="px-3 py-4 text-slate-700 font-medium text-sm">
-        {approval.stage}
+      <td className="px-3 py-4 text-xs text-slate-700"><span>{approval.approvalChain || '--'}</span><span className="mt-1 block text-slate-500">Current: {approval.currentStep || approval.stage || '--'}</span>
       </td>
-
-      {/* Assigned To */}
-      <td className="px-3 py-4 text-slate-600 text-sm">
-        {approval.assignedTo || '-'}
-      </td>
-
-      {/* Action Indicator */}
-      <td className="py-4 pl-3 pr-6 text-right text-xs font-medium text-slate-400">
-        <span className="group-hover:text-slate-700">
-          Open &rarr;
-        </span>
+      <td className="max-w-[220px] px-3 py-4 text-xs text-slate-600">{approval.reasonRequired || '--'}</td>
+      <td className="px-3 py-4" onClick={(event) => event.stopPropagation()}>
+        {(isSalesManager && approval.status === 'Pending' && approval.currentStep === 'Sales Manager') || (isFinanceOperations && approval.status === 'Pending' && String(approval.currentStep || '').toLowerCase() === 'finance') ? <div className="flex flex-wrap justify-end gap-1.5"><button type="button" onClick={() => onAction(approval, 'approve')} className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700">Approve</button><button type="button" onClick={() => onAction(approval, 'return')} className="rounded bg-amber-500 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-600">Return</button><button type="button" onClick={() => onAction(approval, 'reject')} className="rounded bg-rose-600 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-700">Reject</button></div> : <span className="text-xs text-slate-400">View →</span>}
       </td>
     </tr>
   );

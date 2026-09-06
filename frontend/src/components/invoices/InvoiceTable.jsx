@@ -6,13 +6,6 @@ const STATUS_BADGES = {
   Unpaid: 'bg-amber-50 text-amber-700 border-amber-200',
 };
 
-/**
- * InvoiceTable - Displays invoice records in a responsive, accessible table.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.invoices - List of invoice objects
- * @param {Function} props.onRowClick - Callback triggered with invoice.id when a row is clicked
- */
 export const InvoiceTable = ({ invoices = [], onRowClick }) => {
   const formatCurrency = (amount, currency = 'USD') =>
     new Intl.NumberFormat('en-US', {
@@ -28,11 +21,13 @@ export const InvoiceTable = ({ invoices = [], onRowClick }) => {
           <thead className="bg-slate-50 text-slate-700 font-semibold">
             <tr>
               <th scope="col" className="py-3.5 pl-6 pr-3">
-                Invoice #
+                Invoice
               </th>
               <th scope="col" className="px-3 py-3.5">
                 Customer
               </th>
+              <th scope="col" className="px-3 py-3.5">Order</th>
+              <th scope="col" className="px-3 py-3.5">Type</th>
               <th scope="col" className="px-3 py-3.5">
                 Amount
               </th>
@@ -42,15 +37,13 @@ export const InvoiceTable = ({ invoices = [], onRowClick }) => {
               <th scope="col" className="px-3 py-3.5">
                 Due Date
               </th>
-              <th scope="col" className="relative py-3.5 pl-3 pr-6 text-right">
-                <span className="sr-only">Actions</span>
-              </th>
+              <th scope="col" className="px-3 py-3.5">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 bg-white">
             {invoices.length === 0 ? (
               <tr>
-                <td colSpan="6" className="py-8 text-center text-slate-500">
+                <td colSpan="8" className="py-8 text-center text-slate-500">
                   No invoices found.
                 </td>
               </tr>
@@ -79,6 +72,8 @@ export const InvoiceTable = ({ invoices = [], onRowClick }) => {
                     <td className="px-3 py-4 font-medium text-slate-800">
                       {inv.customerName}
                     </td>
+                    <td className="px-3 py-4 text-slate-600">{inv.order || '--'}</td>
+                    <td className="px-3 py-4 text-slate-600">{inv.type || '--'}</td>
                     <td className="px-3 py-4 font-semibold text-slate-900">
                       {formatCurrency(inv.amount, inv.currency)}
                     </td>

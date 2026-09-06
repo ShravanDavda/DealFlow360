@@ -1,0 +1,6 @@
+import * as service from "../services/approvalChainService.js";
+export const list = async (req, res, next) => { try { res.json({ success: true, data: await service.getApprovalChains() }); } catch (error) { next(error); } };
+export const get = async (req, res, next) => { try { const data = await service.getApprovalChain(req.params.id); if (!data) return res.status(404).json({ success: false, message: "Approval chain not found" }); res.json({ success: true, data }); } catch (error) { next(error); } };
+export const create = async (req, res, next) => { try { res.status(201).json({ success: true, data: await service.createApprovalChain(req.body) }); } catch (error) { next(error); } };
+export const update = async (req, res, next) => { try { res.json({ success: true, data: await service.updateApprovalChain(req.params.id, req.body) }); } catch (error) { next(error); } };
+export const deactivate = async (req, res, next) => { try { res.json({ success: true, data: await service.deactivateApprovalChain(req.params.id) }); } catch (error) { next(error); } };

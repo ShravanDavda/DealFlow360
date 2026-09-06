@@ -1,12 +1,6 @@
 import React from 'react';
 import { Layers } from 'lucide-react';
 
-/**
- * ProductVariantsTable - Displays configured product variants with attributes, values, and extra pricing.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.variants - Array of variant objects { attribute, values, extraPrice }
- */
 export const ProductVariantsTable = ({ variants = [] }) => {
   return (
     <div className="space-y-3">

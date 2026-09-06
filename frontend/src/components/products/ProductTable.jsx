@@ -7,13 +7,6 @@ const CATEGORY_STYLES = {
   Subscription: 'bg-blue-50 text-blue-700 border-blue-200',
 };
 
-/**
- * ProductTable - Displays the list of products in the catalog with status, variants, pricing, and taxes.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.products - Array of product objects
- * @param {Function} props.onRowClick - Row selection callback (productId) => void
- */
 export const ProductTable = ({ products = [], onRowClick }) => {
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">

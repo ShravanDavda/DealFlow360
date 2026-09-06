@@ -1,17 +1,9 @@
 import React from 'react';
 import { AlertCircle, AlertTriangle } from 'lucide-react';
 
-/**
- * ApprovalRiskTable - Displays the "Why This Quote Was Flagged" table
- * along with the highlighted rule explanation.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.riskLines - Array of risk line items
- */
 export const ApprovalRiskTable = ({ riskLines = [] }) => {
   return (
     <div className="space-y-4">
-      {/* Section Header */}
       <div className="flex items-center gap-2">
         <AlertTriangle className="h-5 w-5 text-amber-600" />
         <h2 className="text-base font-semibold text-slate-900">
@@ -19,7 +11,6 @@ export const ApprovalRiskTable = ({ riskLines = [] }) => {
         </h2>
       </div>
 
-      {/* Table Container */}
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
@@ -81,7 +72,6 @@ export const ApprovalRiskTable = ({ riskLines = [] }) => {
         </div>
       </div>
 
-      {/* Flag Explanation Banner */}
       <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-3">
         <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
         <p className="text-sm text-amber-800 font-medium">

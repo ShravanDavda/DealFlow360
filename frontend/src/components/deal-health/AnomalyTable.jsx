@@ -1,12 +1,6 @@
 import React from 'react';
 import { AlertCircle, AlertOctagon } from 'lucide-react';
 
-/**
- * AnomalyTable - Renders flagged deal health anomalies in a clean, accessible table.
- * 
- * @param {Object} props
- * @param {Array<Object>} props.anomalies - List of anomaly records
- */
 export const AnomalyTable = ({ anomalies = [] }) => {
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
