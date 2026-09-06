@@ -13,6 +13,7 @@ import {
   getRecommendations,
   previewQuotation
 } from '../services/quotationService';
+import { getCurrentUser } from '../services/authService';
 import { getProducts } from '../services/productService';
 
 export const QuotationDetail = () => {
@@ -20,6 +21,7 @@ export const QuotationDetail = () => {
   const navigate = useNavigate();
 
   const [quote, setQuote] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [products, setProducts] = useState([]);
   const [catalog, setCatalog] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
@@ -64,6 +66,7 @@ export const QuotationDetail = () => {
   };
 
   useEffect(() => {
+    getCurrentUser().then((response) => setCurrentUser(response?.data || null)).catch(() => setCurrentUser(null));
     loadData();
   }, [quotationId]);
 
@@ -175,6 +178,7 @@ export const QuotationDetail = () => {
 
   const customerName = quote?.customerName || '';
   const priceList = quote?.priceList || '';
+  const isQuotationCreator = Boolean(currentUser && quote && Number(currentUser.id) === Number(quote.userId));
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -257,6 +261,7 @@ export const QuotationDetail = () => {
             onUpdateDiscount={handleUpdateDiscount}
             onRemoveItem={handleRemoveItem}
             onAddItem={handleAddItemFromCatalog}
+            readOnly={!isQuotationCreator}
             overallMargin={totals.overallMargin}
             blendedRisk={totals.blendedRisk}
             subtotal={totals.subtotal}
@@ -272,29 +277,38 @@ export const QuotationDetail = () => {
             suggestions={suggestions}
             selectedIds={selectedSuggestions}
             onToggleSuggestion={handleToggleSuggestion}
+            readOnly={!isQuotationCreator}
           />
         </section>
 
         <section aria-label="Actions" className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleSaveDraft}
-            isLoading={isSubmitting}
-            className="sm:!w-auto px-5"
-          >
-            Save Draft
-          </Button>
+          {isQuotationCreator ? (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleSaveDraft}
+                isLoading={isSubmitting}
+                className="sm:!w-auto px-5"
+              >
+                Save Draft
+              </Button>
 
-          <Button
-            type="button"
-            variant="primary"
-            onClick={handleSubmitForApproval}
-            isLoading={isSubmitting}
-            className="sm:!w-auto px-5"
-          >
-            Submit for Approval
-          </Button>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleSubmitForApproval}
+                isLoading={isSubmitting}
+                className="sm:!w-auto px-5"
+              >
+                Submit for Approval
+              </Button>
+            </>
+          ) : (
+            <p className="text-sm text-slate-500">
+              Read-only view. Only the quotation creator can edit or submit this quotation.
+            </p>
+          )}
         </section>
 
       </main>

@@ -6,7 +6,8 @@ export const getQuotations = async (req, res, next) => {
         const { status } = req.query;
         const ownerId = req.user.role === "sales_rep" ? req.user.userId : undefined;
         const ownerRole = req.user.role === "sales_manager" ? "sales_rep" : undefined;
-        const quotes = await quotationService.getAllQuotations({ status, ownerId, ownerRole });
+        const customerId = req.user.role === "customer" ? req.user.customerId : undefined;
+        const quotes = await quotationService.getAllQuotations({ status, ownerId, ownerRole, customerId });
         res.status(200).json({
             success: true,
             data: quotes
@@ -28,6 +29,9 @@ export const getQuotation = async (req, res, next) => {
             });
         }
         if (req.user.role === "sales_rep" && Number(quote.userId) !== Number(req.user.userId)) {
+            return res.status(403).json({ success: false, message: "You can only access your own quotations" });
+        }
+        if (req.user.role === "customer" && Number(quote.customerId) !== Number(req.user.customerId)) {
             return res.status(403).json({ success: false, message: "You can only access your own quotations" });
         }
 
@@ -101,6 +105,7 @@ export const getRecommendations = async (req, res, next) => {
         const quote = await quotationService.getQuotationByCodeOrId(quotationId);
         if (!quote) return res.status(404).json({ success: false, message: "Quotation not found" });
         if (req.user.role === "sales_rep" && Number(quote.userId) !== Number(req.user.userId)) return res.status(403).json({ success: false, message: "You can only access your own quotation recommendations" });
+        if (req.user.role === "customer" && Number(quote.customerId) !== Number(req.user.customerId)) return res.status(403).json({ success: false, message: "You can only access your own quotation recommendations" });
         const recs = await quotationService.getUpsellRecommendations(quotationId);
         res.status(200).json({
             success: true,

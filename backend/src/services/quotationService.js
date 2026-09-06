@@ -56,7 +56,7 @@ export const previewQuotation = async ({ customerId, priceListId, items = [] }) 
     return calculateQuotation({ customerId, priceListId, items });
 };
 
-export const getAllQuotations = async ({ status, ownerId, ownerRole } = {}) => {
+export const getAllQuotations = async ({ status, ownerId, ownerRole, customerId } = {}) => {
     let query = `
         SELECT 
             q.id,
@@ -96,6 +96,10 @@ export const getAllQuotations = async ({ status, ownerId, ownerRole } = {}) => {
     if (ownerRole) {
         params.push(ownerRole);
         filters.push(`u.role = $${params.length}`);
+    }
+    if (customerId) {
+        params.push(customerId);
+        filters.push(`q.customer_id = $${params.length}`);
     }
     if (filters.length) query += ` WHERE ${filters.join(" AND ")}`;
 
@@ -352,7 +356,11 @@ export const updateQuotation = async (idOrCode, { items = [], customerNotes, int
     const quote = await getQuotationByCodeOrId(idOrCode);
     if (!quote) throw new Error("Quotation not found");
     if (!userId) throw new Error("Authenticated user is required");
-    if (Number(quote.userId) !== Number(userId)) throw new Error("Only the quotation creator can edit it");
+    if (Number(quote.userId) !== Number(userId)) {
+        const error = new Error("Only the quotation creator can edit it");
+        error.statusCode = 403;
+        throw error;
+    }
     if (["Approved", "Pending Approval", "Rejected"].includes(quote.status)) throw new Error("Quotation cannot be edited in its current state");
 
     const client = await pool.connect();

@@ -1,623 +1,594 @@
-You are working on the EXISTING DealFlow360 application.
+You are working on the existing DealFlow360 project.
 
-I want you to FINALIZE the Sales Manager role.
-
-IMPORTANT:
-The Sales Manager implementation already exists.
-DO NOT create duplicate dashboards, pages, APIs, components, or business logic.
-Modify/reorganize the EXISTING implementation.
-
-Reuse the existing authentication, JWT, RBAC, quotation, pricing, discount/risk, approval, Deal Health, and reporting systems.
-
-==================================================
-FINAL SALES MANAGER NAVIGATION
-==================================================
-
-When a user with role:
-
-sales_manager
-
-logs in, show:
-
-Dashboard
-Approval Queue
-Quotations
-Deal Health
-Reports
-Profile
-Logout
-
-DO NOT show:
-
-- Products Management
-- Configuration
-- User Registrations
-- Customer Management
-- Price Lists
-- Discount Tiers
-- Approval Chain Configuration
-- Warehouse Management
-- Subscription Plan Configuration
+TASK:
+Fix the UPSSELL / CROSS-SELL responsibility and quotation workflow inconsistency.
 
 IMPORTANT:
-"Discount & Approval Rules" is ADMIN configuration.
-REMOVE it from the Sales Manager navigation.
+Do NOT redesign the application.
+Do NOT create a new upsell/cross-sell system.
+Do NOT modify the database schema unless absolutely necessary.
+Do NOT add hardcoded/mock business data.
+Do NOT change authentication architecture.
+Do NOT give Admin unnecessary quotation-editing permissions.
 
-Do NOT delete the underlying discount/approval rules functionality because the approval engine still uses it.
+The intended responsibility model is:
 
-==================================================
-1. SALES MANAGER DASHBOARD
-==================================================
+ADMIN
+→ configures product pairing/recommendation rules
 
-Use the existing Admin/Sales Rep dashboard design language, but create a Sales Manager-specific dashboard.
+SALES REPRESENTATIVE
+→ uses those recommendations while creating/editing a quotation
 
-Header:
+SALES MANAGER
+→ reviews/approves quotations
 
-Sales Manager Dashboard
+FINANCE / OPERATIONS
+→ handles fulfillment and billing
 
-Subtitle:
-
-Monitor team quotations, approvals, deal health and sales performance.
-
---------------------------------------------------
-KPI CARDS
---------------------------------------------------
-
-Display real data:
-
-1. Pending Approvals
-2. Team Open Quotations
-3. At-Risk Deals
-4. Team Approved Quotations
-
-Use REAL backend data.
-
-Do NOT hardcode numbers.
-
---------------------------------------------------
-APPROVAL OVERVIEW
---------------------------------------------------
-
-Show:
-
-Pending
-Approved
-Returned
-
-These should represent quotation approval activity relevant to the Sales Manager.
-
-Add:
-
-Review Approval Queue
-
-which opens:
-
-Approval Queue
-
---------------------------------------------------
-TEAM SALES PIPELINE
---------------------------------------------------
-
-Show a summary of the sales team's quotation pipeline:
-
-Draft
-Pending Approval
-Approved
-Negotiation
-Confirmed
-
-This is TEAM data, not only the Sales Manager's own quotations.
-
---------------------------------------------------
-RECENT TEAM QUOTATIONS
---------------------------------------------------
-
-Show recent quotations from Sales Representatives under the Sales Manager.
-
-Fields:
-
-Quotation
-Sales Rep
-Customer
-Amount
-Status
-Risk
-
-Clicking a quotation opens the existing quotation detail page.
-
---------------------------------------------------
-DEAL HEALTH SUMMARY
---------------------------------------------------
-
-Show a compact summary:
-
-Stalled Deals
-Discount Anomalies
-Delivery Slippage
-
-Add:
-
-View Deal Health
-
-which opens the existing Deal Health page.
-
-Do NOT create a second Deal Health implementation.
-
---------------------------------------------------
-TEAM SALES ACTIVITY
---------------------------------------------------
-
-Show useful existing team metrics such as:
-
-Quotes Created
-Quotes Approved
-Average Approval Time
-Top Sales Rep
-
-Only use metrics supported by the existing backend/data.
-
-Do NOT fabricate metrics.
-
---------------------------------------------------
-QUICK ACTIONS
---------------------------------------------------
-
-Provide:
-
-Review Approval Queue
-View Quotations
-View Deal Health
-View Reports
+CUSTOMER
+→ negotiates/confirms quotation
 
 ==================================================
-2. APPROVAL QUEUE — SEPARATE PAGE
+1. FIRST INSPECT THE EXISTING IMPLEMENTATION
 ==================================================
 
-Approval Queue must be a separate top-level page.
+Inspect the current implementation of:
 
-Purpose:
+- QuotationDetail.jsx
+- QuotationBoard / quotation pages
+- UpsellSuggestions component
+- AdminProductPairings.jsx
+- productPairingService.js
+- productPairingController.js
+- productPairingRoutes.js
+- quotation service/controller/routes
+- authentication/RBAC
+- RoleGuard
+- current user/role handling
 
-Allow Sales Manager to review quotations requiring Sales Manager approval.
+Trace exactly how:
 
-Show REAL pending approval requests.
+- product pairings are configured
+- recommendations are fetched
+- recommendations are displayed
+- clicking + adds a product
+- quotation changes are saved
+- quotation submission works
+- quotation ownership/creator checks work
 
-Each approval item should show:
-
-Quotation Number
-Sales Representative
-Customer
-Amount
-Risk Rating
-Discount Information
-Current Approval Step
-Submitted Date
-
-Clicking an item opens the existing Approval Detail page.
-
-==================================================
-3. APPROVAL DETAIL
-==================================================
-
-Reuse the existing Approval Detail page.
-
-Sales Manager must be able to:
-
-- Review quotation
-- See customer tier
-- See blended risk
-- See discount violations
-- See affected quotation lines
-- See approval workflow
-- See audit trail
-- Approve
-- Reject
-- Return for Revision
-
-Do NOT create a new approval system.
-
-Use the existing Approval Engine.
+Do not assume the current implementation is correct.
 
 ==================================================
-4. APPROVAL WORKFLOW
+2. CORRECT BUSINESS RESPONSIBILITY
 ==================================================
 
-The Sales Manager should only be able to act when the current approval step belongs to Sales Manager.
+Implement/maintain this responsibility model:
+
+ADMIN:
+
+Can:
+- create product pairings
+- edit product pairings
+- activate/deactivate product pairings
+- configure upsell relationships
+- configure cross-sell relationships
+
+Admin should NOT:
+- edit another user's quotation
+- add products to another user's quotation
+- change quotation quantities
+- change quotation discounts
+- submit another user's quotation
+- approve another user's quotation unless the existing Manager role explicitly provides that permission
+
+SALES REPRESENTATIVE:
+
+Can, according to existing permissions:
+- create quotation
+- edit own quotation
+- add products
+- use upsell recommendations
+- use cross-sell recommendations
+- adjust quantity
+- apply allowed discount
+- save quotation
+- submit quotation for approval
+
+SALES MANAGER:
+
+Can:
+- review quotations requiring approval
+- approve
+- reject
+- return according to existing workflow
+
+FINANCE / OPERATIONS:
+
+Can:
+- perform permitted fulfillment
+- warehouse allocation
+- backorder processing
+- billing/invoice operations
+
+CUSTOMER:
+
+Can:
+- view own quotations
+- negotiate
+- submit counter-offers/questions
+- confirm own quotation
+
+==================================================
+3. FIX ADMIN QUOTATION DETAIL UI
+==================================================
+
+Current problem:
+
+When Admin opens a quotation created by a Sales Representative, the quotation detail page shows:
+
+"Upsell and Cross-Sell Suggestions"
+
+with clickable + buttons.
+
+But the page correctly says:
+
+"Read-only view. Only the quotation creator can edit or submit this quotation."
+
+This is inconsistent.
+
+Fix this.
+
+For a user who is NOT the quotation creator and does NOT have quotation-editing permission:
+
+- quotation remains read-only
+- recommendation cards must NOT have active add buttons
+- do NOT allow the Admin to add recommendations to the quotation
+- do NOT allow local state changes that imply the quotation was modified
+- do NOT show Save Draft
+- do NOT show Submit for Approval
+
+Instead, either:
+
+A. Hide the interactive recommendation section completely,
+
+OR preferably:
+
+B. Show recommendations as READ-ONLY information without + buttons, with a small explanatory message such as:
+
+"Upsell and cross-sell recommendations are configured by Admin and applied by the Sales Representative while editing a quotation."
+
+Use the existing UI design language.
+
+Do not redesign the page.
+
+==================================================
+4. SALES REP QUOTATION FLOW
+==================================================
+
+For the quotation creator / authorized Sales Representative, recommendations should remain interactive.
 
 Example:
 
-HIGH RISK
+Existing quotation:
 
-Sales Manager
-      ↓
-Approve
-      ↓
-Finance
-      ↓
-Approve
-      ↓
-Approved
+Laptop Pro 14 × 1
 
-If the current step is Finance:
+Recommendations:
 
-Sales Manager must NOT be able to approve it.
++ Docking Station
++ Wireless Mouse
++ Care Plan 2yr
 
-Backend authorization must enforce this.
+When Sales Rep clicks:
 
-Do NOT rely only on hiding buttons.
++ Docking Station
 
-==================================================
-5. QUOTATIONS PAGE
-==================================================
+the product should be added to the quotation's working state.
 
-Quotations is a separate top-level page.
+Then:
 
-IMPORTANT:
+quantity/price/discount/margin/risk
+must be recalculated using existing quotation logic.
 
-Unlike Sales Representative:
+The recommendation itself is NOT a separate approval request.
 
-Sales Manager should see the quotations relevant to their SALES TEAM.
+The correct workflow is:
 
-Do NOT limit the Sales Manager to only their own quotations.
+Recommendation
+    ↓
+Sales Rep accepts
+    ↓
+Product becomes quotation line
+    ↓
+Quotation recalculates
+    ↓
+Sales Rep saves
+    ↓
+Sales Rep submits quotation
+    ↓
+Approval workflow if required
 
-Use the existing organizational/team relationship if one already exists.
+Do NOT create a separate:
 
-Do NOT invent a new team structure if the database already has an existing relationship.
+"Submit Upsell Request"
 
---------------------------------------------------
-QUOTATION VIEWS
---------------------------------------------------
-
-Preserve existing Board/Table functionality.
-
-Possible statuses:
-
-Draft
-Pending Approval
-Approved
-Negotiation
-Confirmed
-
-Use the existing quotation statuses.
-
---------------------------------------------------
-QUOTATION INFORMATION
---------------------------------------------------
-
-Show:
-
-Quotation
-Sales Representative
-Customer
-Amount
-Status
-Risk
-Updated
-
-Click → existing quotation detail/builder.
+mechanism.
 
 ==================================================
-6. DEAL HEALTH
+5. SAVE / SUBMIT FLOW
 ==================================================
 
-Deal Health belongs to Sales Manager.
+Verify that after accepting an upsell/cross-sell recommendation:
 
-KEEP the existing Deal Health feature.
+Sales Rep can:
 
-Sales Manager should be able to view:
+1. Add recommended product.
+2. See it as a quotation line.
+3. See updated subtotal.
+4. See updated discount.
+5. See updated tax.
+6. See updated total.
+7. See updated margin.
+8. See updated risk.
+9. Save Draft.
+10. Submit for Approval.
 
-- Stalled deals
-- Discount anomalies
-- Delivery slippage
-- At-risk deals
-- Relevant deal/quotation information
-- Existing nudges/escalation functionality
+If the new product/discount causes an approval requirement, the normal quotation approval workflow must handle it.
 
-Do NOT create another Deal Health engine.
-
-Use the existing Deal Health backend/API.
-
-==================================================
-7. REPORTS
-==================================================
-
-Sales Manager can access the existing Reports functionality where it supports sales/team oversight.
-
-Do NOT expose Admin configuration functionality through Reports.
-
-Use existing reports.
-
-Do not create a new reporting engine.
+Do not create a separate approval system for upsell/cross-sell.
 
 ==================================================
-8. DISCOUNT & APPROVAL RULES
+6. DO NOT BYPASS BACKEND AUTHORIZATION
 ==================================================
 
-REMOVE this from Sales Manager navigation:
+The frontend visibility check is NOT sufficient.
 
-Discount & Approval Rules
+Verify backend APIs also enforce:
 
-Sales Manager can VIEW the discount/risk information attached to quotations.
+- Admin cannot modify another user's quotation.
+- Non-creators cannot save another user's quotation through direct API calls.
+- Non-creators cannot submit another user's quotation.
+- Customer cannot modify quotation lines directly.
+- Customer can only use the existing negotiation workflow.
+- Sales Rep can only modify quotations allowed by existing ownership/permission rules.
 
-Sales Manager must NOT configure:
+If backend authorization is already correct, preserve it.
 
-- Discount tiers
-- Discount rules
-- Customer tier ceilings
-- Category discount ceilings
-- Approval chains
-- Approval thresholds
+If there is a gap, fix only that gap.
 
-Those remain Admin configuration responsibilities.
-
-==================================================
-9. CUSTOMER ACCESS
-==================================================
-
-Sales Manager may VIEW customer information associated with quotations.
-
-Sales Manager must NOT create/edit/delete customer master records.
-
-Customer management remains Admin-only.
+Never rely solely on hiding a button.
 
 ==================================================
-10. PRODUCT ACCESS
+7. PRODUCT PAIRING ADMIN FLOW
 ==================================================
 
-Sales Manager may VIEW products through quotation/review workflows.
+Ensure Admin's actual upsell/cross-sell responsibility remains functional.
 
-Sales Manager must NOT:
-
-- Create products
-- Edit products
-- Delete products
-- Configure product catalog
-
-Product management remains Admin functionality.
-
-==================================================
-11. WAREHOUSE / FULFILLMENT
-==================================================
-
-Sales Manager can view relevant fulfillment/deal progress if already supported.
-
-Sales Manager must NOT manage:
-
-- Warehouse configuration
-- Inventory configuration
-- Warehouse allocation
-- Shipping weights
-- Fulfillment overrides
-
-Those belong to Admin/Finance/Operations.
-
-==================================================
-12. SALES MANAGER DATA SCOPE
-==================================================
-
-CRITICAL:
-
-Sales Manager should see the quotations/deals belonging to the Sales Representatives they are responsible for.
-
-Do NOT simply fetch all quotations.
-
-First inspect the existing database for how Sales Representatives and Sales Managers are related.
-
-If an existing team/manager relationship exists, use it.
-
-If there is currently no such relationship, DO NOT invent a complicated new organization system without first checking the existing architecture.
-
-The backend must enforce data scope.
-
-Do not rely on React filtering.
-
-==================================================
-13. APPROVAL SECURITY
-==================================================
-
-Only authorized Sales Managers can perform Sales Manager approval actions.
-
-Backend must verify:
-
-- authenticated user
-- role = sales_manager
-- approval request exists
-- approval request is pending
-- current approval step belongs to Sales Manager
-- request has not already been processed
-
-Use the existing authentication/RBAC middleware.
-
-==================================================
-14. DASHBOARD DATA
-==================================================
-
-All dashboard metrics must come from real backend/database data.
-
-Do NOT hardcode:
-
-Pending Approvals = 5
-At-Risk Deals = 7
-Approved = 20
-
-etc.
-
-Use existing dashboard services where possible.
-
-If an existing dashboard endpoint already provides the required data, reuse it.
-
-Only create a new Sales Manager dashboard endpoint if genuinely necessary.
-
-==================================================
-15. NO DUPLICATE SYSTEMS
-==================================================
-
-Do NOT create:
-
-- another Approval Engine
-- another Deal Health engine
-- another quotation system
-- another reporting engine
-- another authentication system
-- another RBAC system
-- another customer system
-- another product system
-
-Reuse existing implementations.
-
-==================================================
-16. SALES MANAGER NAVIGATION — FINAL
-==================================================
-
-FINAL NAVIGATION MUST BE:
-
-DealFlow360
-[SALES MANAGER]
-
-Dashboard
-Approval Queue
-Quotations
-Deal Health
-Reports
-
-Profile
-Logout
-
-NOT:
-
-Discount & Approval Rules
-
-NOT:
+Admin should be able to go to:
 
 Configuration
+→ Product Pairings
+
+and manage:
+
+- source product
+- recommended product
+- relationship type
+- priority/ranking if supported
+- active/inactive state
+- other existing pairing fields
+
+These configurations must be stored in PostgreSQL through the existing API.
+
+Do NOT hardcode pairings.
 
 ==================================================
-17. ROLE COMPARISON
+8. RECOMMENDATION DATA
 ==================================================
 
-Ensure the final role separation is:
+Recommendations shown to Sales Rep must come from:
 
-ADMIN
-→ Platform administration/configuration
+PostgreSQL
+→ product_pairings
+→ backend API
+→ frontend
 
-SALES REPRESENTATIVE
-→ Own quotations + own pipeline + upsells + quotation execution
+Do not introduce:
 
-SALES MANAGER
-→ Team quotations + approval queue + Deal Health + sales oversight
+const recommendations = [...]
+or:
 
-FINANCE/OPERATIONS
-→ Finance approval + fulfillment + billing
+MOCK_RECOMMENDATIONS
 
-Do not mix these responsibilities.
+or hardcoded product names.
 
-==================================================
-18. EXISTING DESIGN
-==================================================
-
-Use the existing DealFlow360 design system.
-
-Use:
-
-React
-Vite
-JavaScript/JSX
-Tailwind CSS
-shadcn/ui
-Lucide React
-React Router
-Axios
-
-Do NOT use TypeScript.
-
-Do NOT introduce another UI framework.
-
-Make the Sales Manager dashboard visually consistent with the existing Admin/Sales Rep dashboards.
+Use existing product pairing endpoints.
 
 ==================================================
-19. DO NOT CHANGE OTHER ROLES
+9. ADMIN QUOTATION VIEW
 ==================================================
 
-This task is primarily for Sales Manager.
+When Admin opens:
 
-Do NOT redesign:
+Quotation created by Sales Rep
 
-- Sales Representative dashboard
-- Finance/Operations dashboard
-- Customer Portal
+Admin should be able to REVIEW the quotation.
 
-The ONLY related change outside Sales Manager is:
+Admin should be able to see:
 
-Remove "Deal Health" from Admin navigation if it is still present.
+- customer
+- products
+- quantities
+- pricing
+- discount
+- margin/risk information according to existing permissions
+- quotation status
+- approval state
+- audit/history where already supported
 
-Do not delete the Deal Health feature.
+But Admin should not gain edit/submit controls merely because recommendations are visible.
 
 ==================================================
-20. TESTING
+10. IMPORTANT: DO NOT CHANGE ROLE DEFINITIONS
 ==================================================
 
-Test Sales Manager login.
+Do not introduce a new role.
 
-Expected navigation:
+Do not rename existing roles.
 
-Dashboard
+Use the current:
+
+- admin
+- sales representative
+- sales manager/approver
+- finance/operations
+- customer
+
+role architecture.
+
+==================================================
+11. CHECK ALL QUOTATION DETAIL ENTRY POINTS
+==================================================
+
+There may be multiple pages/components that display quotation details.
+
+Search the entire frontend for:
+
+- UpsellSuggestions
+- Upsell
+- CrossSell
+- productPairing
+- recommendations
+- quotation detail
+- add product to quotation
+
+Make sure the same incorrect behavior does not exist elsewhere.
+
+If the same quotation-detail component is reused across roles, implement the permission behavior centrally rather than duplicating logic.
+
+==================================================
+12. PRESERVE EXISTING UI
+==================================================
+
+Do not redesign.
+
+Do not change:
+
+- navigation
+- colors
+- layout
+- typography
+- existing cards
+- existing dashboard structure
+
+Only change:
+
+- visibility
+- interaction permissions
+- explanatory text
+- quotation editing behavior where required
+
+==================================================
+13. TEST CASES
+==================================================
+
+Test at minimum:
+
+TEST 1 — ADMIN
+
+Login as Admin.
+
+Open a Sales Rep quotation.
+
+Expected:
+
+- quotation visible
+- quotation is read-only
+- no editable quantity controls
+- no editable discount controls
+- no Save Draft
+- no Submit for Approval
+- upsell/cross-sell recommendations are read-only OR hidden
+- Admin cannot add recommended products
+
+Also attempt direct API modification.
+
+Expected:
+403/appropriate authorization failure.
+
+--------------------------------------------------
+
+TEST 2 — SALES REP
+
+Login as Sales Rep who owns quotation.
+
+Open own quotation.
+
+Expected:
+
+- recommendations visible
+- + buttons available
+- click + on recommendation
+- product added to working quotation
+- totals recalculate
+- margin/risk recalculate
+- Save Draft works
+- Submit for Approval works
+
+--------------------------------------------------
+
+TEST 3 — SALES REP SUBMISSION
+
+After adding an upsell/cross-sell product:
+
+Submit quotation.
+
+Expected:
+
+normal quotation submission workflow occurs.
+
+If approval is required:
+
+quotation enters existing approval workflow.
+
+No separate upsell approval request is created.
+
+--------------------------------------------------
+
+TEST 4 — MANAGER
+
+Login as Sales Manager.
+
+Open quotation requiring approval.
+
+Expected:
+
+Manager sees quotation and approval controls according to existing permissions.
+
+Manager does not see Sales Rep-only edit controls.
+
+--------------------------------------------------
+
+TEST 5 — ADMIN PAIRING CONFIGURATION
+
+Login as Admin.
+
+Go to:
+
+Configuration
+→ Product Pairings
+
+Create/update/deactivate a pairing.
+
+Then open a Sales Rep quotation containing the source product.
+
+Expected:
+
+recommendation comes from the updated database pairing.
+
+No frontend hardcoded pairing is involved.
+
+==================================================
+14. REGRESSION CHECK
+==================================================
+
+After the change, verify that these existing features still work:
+
+- Admin Product Pairings
+- Sales Rep quotation creation
+- Sales Rep quotation editing
+- quotation calculation
+- discount limit checking
+- margin calculation
+- risk calculation
+- approval routing
+- customer negotiation
+- customer confirmation
+- fulfillment
+- billing
+
+Do not modify unrelated functionality.
+
+==================================================
+15. FINAL CODE SEARCH
+==================================================
+
+Search for:
+
+- MOCK_
+- mockRecommendations
+- hardcoded product names
+- hardcoded pairing data
+- hardcoded customer data
+- hardcoded quotation data
+
+Do not leave runtime business data hardcoded.
+
+Seed/demo data belongs in PostgreSQL seed.sql.
+
+==================================================
+16. ACCEPTANCE CRITERIA
+==================================================
+
+The fix is COMPLETE only when:
+
+ADMIN:
+
+Configuration
+→ Product Pairings
+→ manages recommendation rules
+
+SALES REP:
+
+Quotation
+→ sees recommendations
+→ clicks +
+→ product added
+→ quotation recalculates
+→ saves
+→ submits
+
+MANAGER:
+
 Approval Queue
-Quotations
-Deal Health
-Reports
-Profile
-Logout
+→ reviews
+→ approves/rejects/returns
 
-Verify:
+FINANCE/OPS:
 
-1. Sales Manager dashboard loads.
-2. Dashboard uses real data.
-3. Approval Queue shows relevant pending approvals.
-4. Sales Manager can open Approval Detail.
-5. Sales Manager can Approve.
-6. Sales Manager can Reject.
-7. Sales Manager can Return for Revision.
-8. Sales Manager cannot approve Finance-level requests.
-9. Sales Manager can view team quotations.
-10. Sales Manager can access Deal Health.
-11. Sales Manager can access Reports.
-12. Sales Manager cannot access Admin Configuration.
-13. Sales Manager cannot configure discount rules.
-14. Sales Manager cannot configure approval chains.
-15. Sales Manager cannot create customers.
-16. Sales Manager cannot manage products.
-17. Sales Manager cannot manage warehouses.
-18. Sales Manager cannot manage subscription plans.
-19. Sales Representative functionality remains unchanged.
-20. Admin functionality remains unchanged except Deal Health removal.
+Fulfillment
+→ inventory
+→ backorder
+→ billing
+
+CUSTOMER:
+
+Portal
+→ negotiation
+→ confirmation
+
+There must be NO situation where:
+
+Admin sees an interactive + recommendation button
+BUT
+Admin is told the quotation is read-only.
+
+That inconsistency must be eliminated.
 
 ==================================================
-FINAL REQUIREMENT
+17. FINAL REPORT
 ==================================================
 
-The Sales Manager is a MANAGEMENT + APPROVAL workspace.
+Report:
 
-Final structure:
+1. Files changed
+2. Components changed
+3. Backend authorization changes, if any
+4. Exact Admin behavior
+5. Exact Sales Rep behavior
+6. Product pairing behavior
+7. Tests performed
+8. Test results
+9. Any remaining issues
 
-Dashboard
-→ Team overview
-
-Approval Queue
-→ Review and act on quotation approvals
-
-Quotations
-→ View/review team quotations
-
-Deal Health
-→ Monitor stalled/risky/problematic deals
-
-Reports
-→ Team sales/performance reporting
-
-Profile
-→ Account information
-
-Logout
-→ Sign out
-
-Do NOT add unnecessary pages or features.
-Do NOT duplicate existing functionality.
+Do NOT claim completion unless all acceptance tests pass.

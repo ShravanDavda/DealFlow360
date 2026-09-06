@@ -221,7 +221,11 @@ export const submitQuotation = async (codeOrId, userId) => {
         const user = await getUser(client, userId);
         const quote = await lockQuotation(client, codeOrId);
         if (!quote) throw new Error("Quotation not found");
-        if (Number(quote.user_id) !== Number(userId)) throw new Error("Only the quotation creator can submit it");
+        if (Number(quote.user_id) !== Number(userId)) {
+            const error = new Error("Only the quotation creator can submit it");
+            error.statusCode = 403;
+            throw error;
+        }
         if (!["Draft", "Returned", "Under Negotiation"].includes(quote.status)) throw new Error("Quotation is not in a submittable state");
         const itemResult = await client.query(`SELECT product_id AS "productId", product_variant_id AS "productVariantId", quantity, discount_percent AS "discountPercent" FROM quotation_items WHERE quotation_id = $1 ORDER BY id`, [quote.id]);
         const calculation = await calculateQuotation({ client, customerId: quote.customer_id, priceListId: quote.price_list_id, items: itemResult.rows });

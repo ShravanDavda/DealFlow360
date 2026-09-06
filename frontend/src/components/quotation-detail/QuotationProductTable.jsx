@@ -9,6 +9,7 @@ export const QuotationProductTable = ({
   onUpdateDiscount,
   onRemoveItem,
   onAddItem,
+  readOnly = false,
   overallMargin = 0,
   blendedRisk = 'LOW',
   subtotal = 0,
@@ -33,15 +34,17 @@ export const QuotationProductTable = ({
         <h2 className="text-base font-semibold text-slate-900">
           Quotation Line Items ({products.length})
         </h2>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setShowPicker(!showPicker)}
-          className="sm:!w-auto text-xs px-3 py-1.5 gap-1.5 border-slate-300 text-slate-700 hover:bg-slate-100"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          <span>Add Product to Quote</span>
-        </Button>
+        {!readOnly && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowPicker(!showPicker)}
+            className="sm:!w-auto text-xs px-3 py-1.5 gap-1.5 border-slate-300 text-slate-700 hover:bg-slate-100"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Add Product to Quote</span>
+          </Button>
+        )}
       </div>
 
       {showPicker && availableCatalog.length > 0 && (
@@ -120,8 +123,9 @@ export const QuotationProductTable = ({
                         <div className="inline-flex items-center border border-slate-300 rounded shadow-sm bg-white">
                           <button
                             type="button"
+                            disabled={readOnly}
                             onClick={() => onUpdateQuantity && onUpdateQuantity(item.id, Math.max(1, Number(item.quantity || 1) - 1))}
-                            className="px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                            className="px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             -
                           </button>
@@ -130,8 +134,9 @@ export const QuotationProductTable = ({
                           </span>
                           <button
                             type="button"
+                            disabled={readOnly}
                             onClick={() => onUpdateQuantity && onUpdateQuantity(item.id, Number(item.quantity || 1) + 1)}
-                            className="px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                            className="px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             +
                           </button>
@@ -144,11 +149,12 @@ export const QuotationProductTable = ({
                         <div className="relative inline-flex items-center w-20">
                           <input
                             type="number"
+                            disabled={readOnly}
                             min="0"
                             max="100"
                             value={item.discount}
                             onChange={(e) => onUpdateDiscount && onUpdateDiscount(item.id, Number(e.target.value))}
-                            className={`w-full text-right pr-6 pl-2 py-1 text-xs border rounded font-semibold focus:outline-none focus:ring-1 ${
+                            className={`w-full text-right pr-6 pl-2 py-1 text-xs border rounded font-semibold focus:outline-none focus:ring-1 disabled:cursor-not-allowed disabled:bg-slate-100 ${
                               isOverLimit
                                 ? 'border-rose-400 text-rose-700 bg-rose-50/50 focus:ring-rose-500'
                                 : 'border-slate-300 text-slate-800 focus:ring-slate-900'
@@ -177,8 +183,9 @@ export const QuotationProductTable = ({
                       <td className="py-3.5 pr-6 text-right">
                         <button
                           type="button"
+                          disabled={readOnly}
                           onClick={() => onRemoveItem && onRemoveItem(item.id)}
-                          className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
+                          className="text-slate-400 hover:text-rose-600 p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                           title="Remove item"
                         >
                           <Trash2 className="h-4 w-4" />

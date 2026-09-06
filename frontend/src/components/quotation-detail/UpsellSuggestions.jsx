@@ -5,6 +5,7 @@ export const UpsellSuggestions = ({
   suggestions = [],
   selectedIds = [],
   onToggleSuggestion,
+  readOnly = false,
 }) => {
   return (
     <div className="space-y-4">
@@ -15,6 +16,12 @@ export const UpsellSuggestions = ({
         </h2>
       </div>
 
+      {readOnly && (
+        <p className="text-sm text-slate-500">
+          Upsell and cross-sell recommendations are configured by Admin and applied by the Sales Representative while editing a quotation.
+        </p>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {suggestions.map((item) => {
           const isSelected = selectedIds.includes(item.id);
@@ -22,16 +29,17 @@ export const UpsellSuggestions = ({
           return (
             <div
               key={item.id}
-              onClick={() => onToggleSuggestion && onToggleSuggestion(item)}
-              role="button"
-              tabIndex={0}
+              onClick={readOnly ? undefined : () => onToggleSuggestion && onToggleSuggestion(item)}
+              role={readOnly ? undefined : 'button'}
+              tabIndex={readOnly ? undefined : 0}
               onKeyDown={(e) => {
+                if (readOnly) return;
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
                   onToggleSuggestion && onToggleSuggestion(item);
                 }
               }}
-              className={`p-4 rounded-lg border text-left cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-slate-900 ${
+              className={`p-4 rounded-lg border text-left transition-all ${readOnly ? '' : 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-900'} ${
                 isSelected
                   ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
                   : 'bg-white text-slate-900 border-slate-200 shadow-sm hover:border-slate-300'
@@ -48,7 +56,7 @@ export const UpsellSuggestions = ({
                       : 'bg-slate-100 text-slate-600'
                   }`}
                 >
-                  {isSelected ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                  {readOnly ? null : isSelected ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
                 </div>
               </div>
               <p
