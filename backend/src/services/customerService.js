@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import pool from "../config/db.js";
+import { sendCustomerActivationEmail } from "./emailService.js";
 
 export const generateActivationCode = () => {
     const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -238,6 +239,12 @@ const createCustomer = async ({
 
         const customerRecord = await getCustomerById(newCustomerId);
         const userRow = userResult.rows[0];
+        const emailStatus = await sendCustomerActivationEmail({
+            email: userRow.email,
+            companyName: customerRecord.company_name,
+            activationCode: rawActivationCode,
+            expiresAt: activationExpiresAt
+        });
 
         return {
             ...customerRecord,
@@ -246,7 +253,8 @@ const createCustomer = async ({
                 email: userRow.email,
                 status: "pending_activation",
                 activationCode: rawActivationCode,
-                activationExpiresAt: activationExpiresAt.toISOString()
+                activationExpiresAt: activationExpiresAt.toISOString(),
+                ...emailStatus
             }
         };
     } catch (err) {
@@ -332,13 +340,21 @@ const reissueActivation = async (customerId) => {
         user = insertUser.rows[0];
     }
 
+    const emailStatus = await sendCustomerActivationEmail({
+        email: customer.email,
+        companyName: customer.company_name,
+        activationCode: newRawCode,
+        expiresAt: newExpiry
+    });
+
     return {
         customerId: customer.id,
         companyName: customer.company_name,
         email: customer.email,
         activationCode: newRawCode,
         activationExpiresAt: newExpiry.toISOString(),
-        status: "pending_activation"
+        status: "pending_activation",
+        ...emailStatus
     };
 };
 

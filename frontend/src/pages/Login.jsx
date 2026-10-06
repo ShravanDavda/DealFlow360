@@ -187,6 +187,14 @@ export const Login = () => {
                   )}
                 </button>
               </div>
+              <div className="mt-1.5 flex justify-end">
+                <Link
+                  to="/forgot-password"
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-600 rounded"
+                >
+                  Forgot Password?
+                </Link>
+              </div>
             </div>
 
             <div className="pt-1">

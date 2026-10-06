@@ -3,7 +3,11 @@ import pool from "../config/db.js";
 import {
     registerUser,
     loginUser,
-    activateCustomer
+    activateCustomer,
+    requestForgotPasswordOtp,
+    resendForgotPasswordOtp,
+    verifyForgotPasswordOtp,
+    resetPasswordWithToken
 } from "../services/authService.js";
 
 const register = async (req, res) => {
@@ -182,9 +186,75 @@ const getCurrentUser = async (req, res) => {
     }
 };
 
+const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const result = await requestForgotPasswordOtp(email);
+        res.status(200).json(result);
+    } catch (error) {
+        const status = error.statusCode || 500;
+        res.status(status).json({
+            success: false,
+            message: error.message || "Failed to process forgot password request"
+        });
+    }
+};
+
+const resendResetOtp = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const result = await resendForgotPasswordOtp(email);
+        res.status(200).json(result);
+    } catch (error) {
+        const status = error.statusCode || 500;
+        res.status(status).json({
+            success: false,
+            message: error.message || "Failed to resend verification code"
+        });
+    }
+};
+
+const verifyResetOtp = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        const result = await verifyForgotPasswordOtp({ email, otp });
+        res.status(200).json({
+            success: true,
+            message: result.message,
+            data: {
+                resetToken: result.resetToken
+            }
+        });
+    } catch (error) {
+        const status = error.statusCode || 400;
+        res.status(status).json({
+            success: false,
+            message: error.message || "Failed to verify code"
+        });
+    }
+};
+
+const resetPassword = async (req, res) => {
+    try {
+        const { resetToken, newPassword, confirmPassword } = req.body;
+        const result = await resetPasswordWithToken({ resetToken, newPassword, confirmPassword });
+        res.status(200).json(result);
+    } catch (error) {
+        const status = error.statusCode || 400;
+        res.status(status).json({
+            success: false,
+            message: error.message || "Failed to reset password"
+        });
+    }
+};
+
 export {
     register,
     login,
     activateCustomerAccount,
-    getCurrentUser
+    getCurrentUser,
+    forgotPassword,
+    resendResetOtp,
+    verifyResetOtp,
+    resetPassword
 };

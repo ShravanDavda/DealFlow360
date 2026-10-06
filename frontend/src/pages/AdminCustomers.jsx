@@ -119,6 +119,8 @@ export const AdminCustomers = () => {
             activationCode: result.portalAccount.activationCode,
             status: result.portalAccount.status || 'pending_activation',
             expiresAt: result.portalAccount.activationExpiresAt,
+            emailSent: result.portalAccount.emailSent,
+            emailError: result.portalAccount.emailError,
             isNew: true
           });
         }
@@ -143,6 +145,8 @@ export const AdminCustomers = () => {
         activationCode: result.activationCode,
         status: result.status || 'pending_activation',
         expiresAt: result.activationExpiresAt,
+        emailSent: result.emailSent,
+        emailError: result.emailError,
         isNew: false
       });
       setFeedback({ type: 'success', text: `New activation code generated for ${customer.company_name}.` });
@@ -321,6 +325,12 @@ export const AdminCustomers = () => {
                 <p className="mt-1.5 text-xs text-slate-500">
                   Single-use code. Valid for 24 hours. Provide this code to the customer to set their password at <span className="font-mono text-slate-700">/activate</span>.
                 </p>
+              </div>
+
+              <div className={`rounded border px-3 py-2 text-sm ${activationModal.emailSent ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                {activationModal.emailSent
+                  ? 'Activation token has been sent to the customer email.'
+                  : `Activation token generated, but email delivery failed. ${activationModal.emailError || 'Provide the token manually.'}`}
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex justify-end">

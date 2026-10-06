@@ -243,6 +243,29 @@ const ensureAdminConfigurationSchema = async () => {
         CREATE INDEX IF NOT EXISTS idx_backorder_records_quote ON backorder_records(quotation_id);
         ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS cgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
         ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS sgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
+
+        -- Password Reset Tokens Table
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+            email VARCHAR(255) NOT NULL,
+            otp_hash VARCHAR(255) NOT NULL,
+            otp_expires_at TIMESTAMPTZ NOT NULL,
+            otp_send_count INTEGER NOT NULL DEFAULT 1,
+            last_otp_sent_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            first_otp_sent_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            failed_attempts INTEGER NOT NULL DEFAULT 0,
+            is_otp_verified BOOLEAN NOT NULL DEFAULT FALSE,
+            reset_token_hash VARCHAR(255),
+            reset_token_expires_at TIMESTAMPTZ,
+            is_used BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_email ON password_reset_tokens(email);
+        CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+        CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_reset_token_hash ON password_reset_tokens(reset_token_hash);
+        CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_active ON password_reset_tokens(user_id, is_used, is_otp_verified);
     `);
 };
 

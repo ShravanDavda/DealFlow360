@@ -2,6 +2,9 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Register } from './pages/Register';
 import { Login } from './pages/Login';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { VerifyResetOTP } from './pages/VerifyResetOTP';
+import { ResetPassword } from './pages/ResetPassword';
 import { Dashboard } from './pages/Dashboard';
 import { Quotations } from './pages/Quotations';
 import { QuotationDetail } from './pages/QuotationDetail';
@@ -72,6 +75,9 @@ export function App() {
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/verify-reset-otp" element={<VerifyResetOTP />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/activate" element={<CustomerActivation />} />
         <Route path="/customer/activate" element={<CustomerActivation />} />
         <Route path="/dashboard" element={<DashboardLanding />} />

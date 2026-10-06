@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import pool from "../config/db.js";
+import { sendPasswordResetOtp } from "./emailService.js";
 
 const registerUser = async ({
     username,
@@ -315,8 +316,416 @@ const loginUser = async ({ email, password }) => {
     };
 };
 
+const GENERIC_FORGOT_PASSWORD_MESSAGE =
+    "If this email is registered with DealFlow360, a verification code has been sent.";
+
+const requestForgotPasswordOtp = async (email) => {
+    if (!email || !email.trim()) {
+        const err = new Error("Email address is required");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+        const err = new Error("Please enter a valid email address");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    // Lookup user in users table
+    const userRes = await pool.query(
+        "SELECT id, email FROM users WHERE LOWER(email) = $1",
+        [trimmedEmail]
+    );
+
+    // Email enumeration protection: return generic message if user does not exist
+    if (userRes.rows.length === 0) {
+        return {
+            success: true,
+            message: GENERIC_FORGOT_PASSWORD_MESSAGE
+        };
+    }
+
+    const user = userRes.rows[0];
+
+    // Check rate limits for active window (30 minutes)
+    const recentRes = await pool.query(
+        `SELECT id, otp_send_count, last_otp_sent_at, first_otp_sent_at
+         FROM password_reset_tokens
+         WHERE user_id = $1
+           AND first_otp_sent_at > NOW() - INTERVAL '30 minutes'
+         ORDER BY id DESC
+         LIMIT 1`,
+        [user.id]
+    );
+
+    let otpSendCount = 1;
+    let firstOtpSentAt = new Date();
+
+    if (recentRes.rows.length > 0) {
+        const recent = recentRes.rows[0];
+        const now = Date.now();
+        const lastSent = new Date(recent.last_otp_sent_at).getTime();
+
+        // 30-second resend cooldown
+        if (now - lastSent < 30 * 1000) {
+            const err = new Error("Please wait before requesting another OTP.");
+            err.statusCode = 429;
+            throw err;
+        }
+
+        // Maximum 3 OTP sends within 30 minutes
+        if (recent.otp_send_count >= 3) {
+            const err = new Error("Too many OTP requests. Please try again later.");
+            err.statusCode = 429;
+            throw err;
+        }
+
+        otpSendCount = recent.otp_send_count + 1;
+        firstOtpSentAt = recent.first_otp_sent_at;
+    }
+
+    // Invalidate all previous unverified reset requests for this user
+    await pool.query(
+        `UPDATE password_reset_tokens
+         SET is_used = TRUE, updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $1 AND is_used = FALSE`,
+        [user.id]
+    );
+
+    // Generate cryptographically secure 6-digit OTP
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
+
+    // Store only the hash in PostgreSQL
+    await pool.query(
+        `INSERT INTO password_reset_tokens (
+            user_id,
+            email,
+            otp_hash,
+            otp_expires_at,
+            otp_send_count,
+            last_otp_sent_at,
+            first_otp_sent_at,
+            failed_attempts,
+            is_otp_verified,
+            is_used
+        ) VALUES ($1, $2, $3, CURRENT_TIMESTAMP + INTERVAL '10 minutes', $4, CURRENT_TIMESTAMP, $5, 0, FALSE, FALSE)`,
+        [user.id, trimmedEmail, otpHash, otpSendCount, firstOtpSentAt]
+    );
+
+    // Send email using existing Brevo service
+    await sendPasswordResetOtp({ email: user.email, otp });
+
+    return {
+        success: true,
+        message: GENERIC_FORGOT_PASSWORD_MESSAGE
+    };
+};
+
+const resendForgotPasswordOtp = async (email) => {
+    if (!email || !email.trim()) {
+        const err = new Error("Email address is required");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+        const err = new Error("Please enter a valid email address");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const userRes = await pool.query(
+        "SELECT id, email FROM users WHERE LOWER(email) = $1",
+        [trimmedEmail]
+    );
+
+    // Maintain anti-enumeration behavior for unregistered emails
+    if (userRes.rows.length === 0) {
+        return {
+            success: true,
+            message: GENERIC_FORGOT_PASSWORD_MESSAGE
+        };
+    }
+
+    const user = userRes.rows[0];
+
+    // Check rate limits
+    const recentRes = await pool.query(
+        `SELECT id, otp_send_count, last_otp_sent_at, first_otp_sent_at
+         FROM password_reset_tokens
+         WHERE user_id = $1
+           AND first_otp_sent_at > NOW() - INTERVAL '30 minutes'
+         ORDER BY id DESC
+         LIMIT 1`,
+        [user.id]
+    );
+
+    let otpSendCount = 1;
+    let firstOtpSentAt = new Date();
+
+    if (recentRes.rows.length > 0) {
+        const recent = recentRes.rows[0];
+        const now = Date.now();
+        const lastSent = new Date(recent.last_otp_sent_at).getTime();
+
+        // 30-second cooldown
+        if (now - lastSent < 30 * 1000) {
+            const err = new Error("Please wait before requesting another OTP.");
+            err.statusCode = 429;
+            throw err;
+        }
+
+        // 3 sends in 30 minutes
+        if (recent.otp_send_count >= 3) {
+            const err = new Error("Too many OTP requests. Please try again later.");
+            err.statusCode = 429;
+            throw err;
+        }
+
+        otpSendCount = recent.otp_send_count + 1;
+        firstOtpSentAt = recent.first_otp_sent_at;
+    }
+
+    // Invalidate previous OTP requests
+    await pool.query(
+        `UPDATE password_reset_tokens
+         SET is_used = TRUE, updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $1 AND is_used = FALSE`,
+        [user.id]
+    );
+
+    // Generate new secure 6-digit OTP
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
+
+    await pool.query(
+        `INSERT INTO password_reset_tokens (
+            user_id,
+            email,
+            otp_hash,
+            otp_expires_at,
+            otp_send_count,
+            last_otp_sent_at,
+            first_otp_sent_at,
+            failed_attempts,
+            is_otp_verified,
+            is_used
+        ) VALUES ($1, $2, $3, CURRENT_TIMESTAMP + INTERVAL '10 minutes', $4, CURRENT_TIMESTAMP, $5, 0, FALSE, FALSE)`,
+        [user.id, trimmedEmail, otpHash, otpSendCount, firstOtpSentAt]
+    );
+
+    // Send via existing Brevo service
+    await sendPasswordResetOtp({ email: user.email, otp });
+
+    return {
+        success: true,
+        message: "A new verification code has been sent to your email."
+    };
+};
+
+const verifyForgotPasswordOtp = async ({ email, otp }) => {
+    if (!email || !email.trim() || !otp) {
+        const err = new Error("Email and verification code are required");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedOtp = otp.toString().trim();
+
+    if (!/^\d{6}$/.test(trimmedOtp)) {
+        const err = new Error("Verification code must be exactly 6 digits");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    // Find latest active reset request for this email
+    const recordRes = await pool.query(
+        `SELECT *
+         FROM password_reset_tokens
+         WHERE LOWER(email) = $1
+           AND is_used = FALSE
+           AND is_otp_verified = FALSE
+         ORDER BY id DESC
+         LIMIT 1`,
+        [trimmedEmail]
+    );
+
+    if (recordRes.rows.length === 0) {
+        const err = new Error("Invalid or expired verification request. Please request a new code.");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const record = recordRes.rows[0];
+
+    // Check if max failed attempts reached (5 attempts limit)
+    if (record.failed_attempts >= 5) {
+        await pool.query(
+            "UPDATE password_reset_tokens SET is_used = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+            [record.id]
+        );
+        const err = new Error("Too many failed attempts. Please restart the password reset process.");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    // Check expiry (10 minutes)
+    if (new Date() > new Date(record.otp_expires_at)) {
+        await pool.query(
+            "UPDATE password_reset_tokens SET is_used = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+            [record.id]
+        );
+        const err = new Error("Verification code has expired. Please request a new code.");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    // Hash supplied OTP
+    const suppliedHash = crypto.createHash("sha256").update(trimmedOtp).digest("hex");
+
+    if (suppliedHash !== record.otp_hash) {
+        const newFailed = record.failed_attempts + 1;
+        if (newFailed >= 5) {
+            await pool.query(
+                "UPDATE password_reset_tokens SET failed_attempts = $1, is_used = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+                [newFailed, record.id]
+            );
+            const err = new Error("Too many failed attempts. Please restart the password reset process.");
+            err.statusCode = 400;
+            throw err;
+        } else {
+            await pool.query(
+                "UPDATE password_reset_tokens SET failed_attempts = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+                [newFailed, record.id]
+            );
+            const remaining = 5 - newFailed;
+            const err = new Error(`Invalid verification code. You have ${remaining} attempt${remaining === 1 ? "" : "s"} remaining.`);
+            err.statusCode = 400;
+            throw err;
+        }
+    }
+
+    // Correct OTP: generate cryptographically secure temporary reset authorization token
+    const rawResetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenHash = crypto.createHash("sha256").update(rawResetToken).digest("hex");
+
+    await pool.query(
+        `UPDATE password_reset_tokens
+         SET is_otp_verified = TRUE,
+             reset_token_hash = $1,
+             reset_token_expires_at = CURRENT_TIMESTAMP + INTERVAL '10 minutes',
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
+        [resetTokenHash, record.id]
+    );
+
+    return {
+        success: true,
+        message: "Email verified successfully.",
+        resetToken: rawResetToken
+    };
+};
+
+const resetPasswordWithToken = async ({ resetToken, newPassword, confirmPassword }) => {
+    if (!resetToken) {
+        const err = new Error("Password reset authorization token is required");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    if (!newPassword || !confirmPassword) {
+        const err = new Error("New password and confirmation are required");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    if (newPassword !== confirmPassword) {
+        const err = new Error("Passwords do not match");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    if (newPassword.length < 6) {
+        const err = new Error("Password must be at least 6 characters long");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(resetToken.trim()).digest("hex");
+
+    const recordRes = await pool.query(
+        `SELECT prt.*, u.customer_id
+         FROM password_reset_tokens prt
+         JOIN users u ON prt.user_id = u.id
+         WHERE prt.reset_token_hash = $1
+           AND prt.is_otp_verified = TRUE
+           AND prt.is_used = FALSE`,
+        [tokenHash]
+    );
+
+    if (recordRes.rows.length === 0) {
+        const err = new Error("Invalid or expired reset token. Please restart the password reset process.");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const record = recordRes.rows[0];
+
+    // Check reset token expiry
+    if (new Date() > new Date(record.reset_token_expires_at)) {
+        await pool.query(
+            "UPDATE password_reset_tokens SET is_used = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+            [record.id]
+        );
+        const err = new Error("Password reset session has expired. Please restart the password reset process.");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    // Hash new password using existing bcrypt (12 rounds)
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    // Update user password in users table
+    await pool.query(
+        "UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+        [passwordHash, record.user_id]
+    );
+
+    // If customer user, sync customers table
+    if (record.customer_id) {
+        await pool.query(
+            "UPDATE customers SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+            [passwordHash, record.customer_id]
+        );
+    }
+
+    // Invalidate reset token and mark all reset requests for this user as used (single use)
+    await pool.query(
+        `UPDATE password_reset_tokens
+         SET is_used = TRUE,
+             reset_token_hash = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $1`,
+        [record.user_id]
+    );
+
+    return {
+        success: true,
+        message: "Password reset successful. You can now log in."
+    };
+};
+
 export {
     registerUser,
     loginUser,
-    activateCustomer
+    activateCustomer,
+    requestForgotPasswordOtp,
+    resendForgotPasswordOtp,
+    verifyForgotPasswordOtp,
+    resetPasswordWithToken
 };

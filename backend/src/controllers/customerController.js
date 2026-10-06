@@ -104,8 +104,9 @@ const createNewCustomer = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message:
-                "Customer created successfully",
+            message: customer.portalAccount.emailSent === false
+                ? "Customer created. Activation token generated, but email delivery failed."
+                : "Customer created successfully. Activation token emailed to the customer.",
             data: customer
         });
     } catch (error) {
@@ -195,7 +196,9 @@ const reissueCustomerActivation = async (req, res) => {
         const result = await reissueActivation(req.params.id);
         res.status(200).json({
             success: true,
-            message: "Activation code generated successfully",
+            message: result.emailSent === false
+                ? "Activation token generated, but email delivery failed."
+                : "Activation token generated and emailed successfully.",
             data: result
         });
     } catch (error) {
