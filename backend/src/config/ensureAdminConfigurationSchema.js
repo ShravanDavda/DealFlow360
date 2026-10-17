@@ -4,6 +4,8 @@ const ensureAdminConfigurationSchema = async () => {
     await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS requested_role VARCHAR(30);
     ALTER TABLE users ADD COLUMN IF NOT EXISTS registration_status VARCHAR(20) NOT NULL DEFAULT 'APPROVED';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255);
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_users_google_id ON users (google_id) WHERE google_id IS NOT NULL;
     UPDATE users SET requested_role = role WHERE requested_role IS NULL;
     UPDATE users SET registration_status = 'APPROVED' WHERE registration_status IS NULL;
     ALTER TABLE users DROP CONSTRAINT IF EXISTS users_requested_role_check;
@@ -243,7 +245,6 @@ const ensureAdminConfigurationSchema = async () => {
         CREATE INDEX IF NOT EXISTS idx_backorder_records_quote ON backorder_records(quotation_id);
         ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS cgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
         ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS sgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
-
         -- Password Reset Tokens Table
         CREATE TABLE IF NOT EXISTS password_reset_tokens (
             id SERIAL PRIMARY KEY,

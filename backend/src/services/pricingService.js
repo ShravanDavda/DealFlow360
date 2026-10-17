@@ -138,8 +138,9 @@ const resolveDiscountRuleCeiling = async ({ db, customerTierId, categoryId, prod
     const columns = new Set(tableRes.rows.map((row) => row.column_name));
     if (!columns.size) return null;
 
-    const ceilingColumn = ['max_discount_percent', 'discount_ceiling', 'max_discount'].find((column) => columns.has(column));
-    if (!ceilingColumn) return null;
+    const candidateColumns = ['max_discount_percent', 'discount_ceiling', 'discount_percentage', 'max_discount'].filter((col) => columns.has(col));
+    if (!candidateColumns.length) return null;
+    const ceilingExpr = `COALESCE(${candidateColumns.join(', ')})`;
     const conditions = columns.has('is_active') ? ['is_active = TRUE'] : ['TRUE'];
     const values = [];
     if (columns.has('customer_tier_id')) {
@@ -155,11 +156,12 @@ const resolveDiscountRuleCeiling = async ({ db, customerTierId, categoryId, prod
         conditions.push(`(product_id = $${values.length} OR product_id IS NULL)`);
     }
     const result = await db.query(
-        `SELECT ${ceilingColumn} AS ceiling FROM discount_rules WHERE ${conditions.join(' AND ')} ORDER BY
+        `SELECT ${ceilingExpr} AS ceiling FROM discount_rules WHERE ${conditions.join(' AND ')} ORDER BY
             CASE WHEN ${columns.has('product_id') ? 'product_id IS NOT NULL' : 'FALSE'} THEN 0 ELSE 1 END,
             CASE WHEN ${columns.has('category_id') ? 'category_id IS NOT NULL' : 'FALSE'} THEN 0 ELSE 1 END,
             id DESC LIMIT 1`,
         values
     );
-    return result.rows[0]?.ceiling === undefined ? null : Number(result.rows[0].ceiling);
+    const rawCeiling = result.rows[0]?.ceiling;
+    return rawCeiling === undefined || rawCeiling === null ? null : Number(rawCeiling);
 };

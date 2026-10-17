@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   User, 
   Mail, 
@@ -12,8 +12,33 @@ import {
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { registerUser } from '../services/authService';
+import { GoogleAuthButton } from '../components/auth/GoogleAuthButton';
 
 export const Register = () => {
+  const navigate = useNavigate();
+
+  const handleGoogleRegisterSuccess = (response) => {
+    setServerError('');
+    if (response?.token) {
+      localStorage.setItem('token', response.token);
+      const userRole = response?.data?.user?.role;
+      navigate(
+        userRole === 'admin'
+          ? '/admin-dashboard'
+          : userRole === 'sales_rep'
+          ? '/sales-rep-dashboard'
+          : userRole === 'sales_manager'
+          ? '/sales-manager-dashboard'
+          : userRole === 'customer'
+          ? '/customer/quotes'
+          : '/dashboard',
+        { replace: true }
+      );
+    } else {
+      setSuccessMessage('Registration submitted with Google. An administrator must approve your requested role before you can sign in.');
+      setFormData({ username: '', email: '', role: '', password: '' });
+    }
+  };
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -248,6 +273,25 @@ export const Register = () => {
             </div>
           </form>
 
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-slate-500 font-medium">Or sign up with</span>
+            </div>
+          </div>
+
+          <GoogleAuthButton
+            buttonText="Sign up with Google"
+            requestedRole={formData.role || undefined}
+            onSuccess={handleGoogleRegisterSuccess}
+            onError={(err) => {
+              setServerError(err);
+              setSuccessMessage('');
+            }}
+            disabled={isLoading}
+          />
           <div className="mt-6 text-center text-sm text-slate-600 border-t border-slate-100 pt-5">
             Already have an account?{' '}
             <Link 

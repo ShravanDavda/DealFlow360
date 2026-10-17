@@ -14,7 +14,7 @@ export const calculateQuotation = async ({ client, customerId, priceListId, item
         const applicableCeilings = [line.customerTierCeiling, line.categoryCeiling, line.discountRuleCeiling]
             .filter((value) => value !== null && value !== undefined && Number.isFinite(Number(value)))
             .map(Number);
-        const allowedDiscount = Math.min(...applicableCeilings);
+        const allowedDiscount = applicableCeilings.length > 0 ? Math.min(...applicableCeilings) : 0;
         const grossAmount = line.unitPrice * line.quantity;
         const discountAmount = grossAmount * line.discountPercent / 100;
         const netAmount = grossAmount - discountAmount;

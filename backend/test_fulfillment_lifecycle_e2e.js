@@ -127,7 +127,7 @@ async function runFulfillmentLifecycleSuite() {
 
         const invItemsRes1 = await pool.query("SELECT * FROM invoice_items WHERE invoice_id = $1", [invRes1.rows[0].id]);
         assert(invItemsRes1.rows.length === 1, "Invoice line items populated in invoice_items table");
-        assert(invItemsRes1.rows[0].quantity === 5, "Invoice item quantity matches quotation (5)");
+        assert(Number(invItemsRes1.rows[0].quantity) === 5, "Invoice item quantity matches quotation (5)");
 
         const foRes1 = await pool.query("SELECT * FROM fulfillment_orders WHERE quotation_id = $1", [q1.dbId]);
         assert(foRes1.rows.length === 1, "Fulfillment order created in fulfillment_orders table");
@@ -164,7 +164,7 @@ async function runFulfillmentLifecycleSuite() {
 
         const bo2 = await pool.query("SELECT * FROM backorder_records WHERE fulfillment_order_id = $1", [foRes2.rows[0].id]);
         assert(bo2.rows.length >= 1, "Backorder record created");
-        assert(bo2.rows[0].backordered_quantity === 4, `Backordered quantity is 4 (actual: ${bo2.rows[0].backordered_quantity})`);
+        assert(Number(bo2.rows[0].backordered_quantity) === 4, `Backordered quantity is 4 (actual: ${bo2.rows[0].backordered_quantity})`);
         assert(bo2.rows[0].status === "PARTIALLY_FULFILLED", "Backorder status is PARTIALLY_FULFILLED");
 
         console.log("\n--- SCENARIO 3: ZERO STOCK FULFILLMENT ---");
@@ -179,7 +179,7 @@ async function runFulfillmentLifecycleSuite() {
 
         const bo3 = await pool.query("SELECT * FROM backorder_records WHERE fulfillment_order_id = $1", [foRes3.rows[0].id]);
         assert(bo3.rows.length >= 1, "Backorder record exists");
-        assert(bo3.rows[0].backordered_quantity === 10, `Backordered quantity is 10 (actual: ${bo3.rows[0].backordered_quantity})`);
+        assert(Number(bo3.rows[0].backordered_quantity) === 10, `Backordered quantity is 10 (actual: ${bo3.rows[0].backordered_quantity})`);
         assert(bo3.rows[0].status === "PENDING", "Backorder status is PENDING");
 
         const invStock3 = await pool.query("SELECT quantity_on_hand FROM warehouse_inventory WHERE warehouse_id = $1 AND product_id = $2", [wh1Id, prodId]);
@@ -207,7 +207,7 @@ async function runFulfillmentLifecycleSuite() {
 
         console.log("\n--- SCENARIO 5: BACKORDER REPLENISHMENT ---");
         const boPre5 = await pool.query("SELECT backordered_quantity FROM backorder_records WHERE fulfillment_order_id = $1", [foRes2.rows[0].id]);
-        assert(boPre5.rows[0].backordered_quantity === 4, "Backorder quantity before replenishment is 4");
+        assert(Number(boPre5.rows[0].backordered_quantity) === 4, "Backorder quantity before replenishment is 4");
 
         const repRes5 = await request("POST", `/admin/warehouses/${wh1Id}/inventory`, {
             productId: prodId,
@@ -222,7 +222,7 @@ async function runFulfillmentLifecycleSuite() {
         assert(foPost5.rows[0].status === "Fulfilled", `Fulfillment order status updated to 'Fulfilled' (actual: ${foPost5.rows[0].status})`);
 
         const boPost5 = await pool.query("SELECT * FROM backorder_records WHERE fulfillment_order_id = $1", [foRes2.rows[0].id]);
-        assert(boPost5.rows[0].backordered_quantity === 0, "Backorder quantity after replenishment is 0");
+        assert(Number(boPost5.rows[0].backordered_quantity) === 0, "Backorder quantity after replenishment is 0");
         assert(boPost5.rows[0].status === "FULFILLED", "Backorder status is 'FULFILLED'");
 
         const stockPost5 = await pool.query("SELECT quantity_on_hand FROM warehouse_inventory WHERE warehouse_id = $1 AND product_id = $2", [wh1Id, prodId]);
@@ -241,7 +241,7 @@ async function runFulfillmentLifecycleSuite() {
         assert(foPost6a.rows[0].status === "Partially Shipped", `Order status is 'Partially Shipped' (actual: ${foPost6a.rows[0].status})`);
 
         const boPost6a = await pool.query("SELECT * FROM backorder_records WHERE fulfillment_order_id = $1", [foRes3.rows[0].id]);
-        assert(boPost6a.rows[0].backordered_quantity === 4, `Remaining backorder is 4 (actual: ${boPost6a.rows[0].backordered_quantity})`);
+        assert(Number(boPost6a.rows[0].backordered_quantity) === 4, `Remaining backorder is 4 (actual: ${boPost6a.rows[0].backordered_quantity})`);
 
         await request("POST", `/admin/warehouses/${wh1Id}/inventory`, {
             productId: prodId,
@@ -255,7 +255,7 @@ async function runFulfillmentLifecycleSuite() {
         assert(foPost6b.rows[0].status === "Fulfilled", `Order status is 'Fulfilled' (actual: ${foPost6b.rows[0].status})`);
 
         const boPost6b = await pool.query("SELECT * FROM backorder_records WHERE fulfillment_order_id = $1", [foRes3.rows[0].id]);
-        assert(boPost6b.rows[0].backordered_quantity === 0, "Remaining backorder is 0");
+        assert(Number(boPost6b.rows[0].backordered_quantity) === 0, "Remaining backorder is 0");
         assert(boPost6b.rows[0].status === "FULFILLED", "Backorder status is 'FULFILLED'");
 
         console.log("\n--- SCENARIO 7: DUPLICATE REQUESTS & IDEMPOTENCY ---");

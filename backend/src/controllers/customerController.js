@@ -104,7 +104,7 @@ const createNewCustomer = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: customer.portalAccount.emailSent === false
+            message: customer.portalAccount?.emailSent === false
                 ? "Customer created. Activation token generated, but email delivery failed."
                 : "Customer created successfully. Activation token emailed to the customer.",
             data: customer

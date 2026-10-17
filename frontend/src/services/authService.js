@@ -20,6 +20,11 @@ export const activateCustomerAccount = async (activationData) => {
   return response.data;
 };
 
+export const loginWithGoogle = async (googleAuthData) => {
+  const response = await api.post('/auth/google', googleAuthData);
+  return response.data;
+};
+
 export const forgotPassword = async (email) => {
   const response = await api.post('/auth/forgot-password', { email });
   return response.data;
@@ -39,4 +44,3 @@ export const resetPassword = async ({ resetToken, newPassword, confirmPassword }
   const response = await api.post('/auth/reset-password', { resetToken, newPassword, confirmPassword });
   return response.data;
 };
-

@@ -5,6 +5,7 @@ import {
     login,
     activateCustomerAccount,
     getCurrentUser,
+    googleAuth,
     forgotPassword,
     resendResetOtp,
     verifyResetOtp,
@@ -18,6 +19,8 @@ const router = express.Router();
 router.post("/register", register);
 
 router.post("/login", login);
+
+router.post("/google", googleAuth);
 
 router.post("/activate-customer", activateCustomerAccount);
 router.post("/activate", activateCustomerAccount);

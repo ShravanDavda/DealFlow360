@@ -11,10 +11,37 @@ import {
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { loginUser } from '../services/authService';
+import { GoogleAuthButton } from '../components/auth/GoogleAuthButton';
 
 export const Login = () => {
   const navigate = useNavigate();
 
+  const handleGoogleSuccess = (response) => {
+    setServerError('');
+    if (response?.isNewUser || response?.data?.registrationStatus === 'PENDING') {
+      setSuccessMessage('Registration submitted with Google. An administrator must approve your account before you can sign in.');
+      return;
+    }
+
+    const token = response?.token || response?.data?.token;
+    if (token) {
+      localStorage.setItem('token', token);
+    }
+
+    const userRole = response?.data?.user?.role;
+    navigate(
+      userRole === 'admin'
+        ? '/admin-dashboard'
+        : userRole === 'sales_rep'
+        ? '/sales-rep-dashboard'
+        : userRole === 'sales_manager'
+        ? '/sales-manager-dashboard'
+        : userRole === 'customer'
+        ? '/customer/quotes'
+        : '/dashboard',
+      { replace: true }
+    );
+  };
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -208,6 +235,23 @@ export const Login = () => {
             </div>
           </form>
 
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-slate-500 font-medium">Or continue with</span>
+            </div>
+          </div>
+
+          <GoogleAuthButton
+            onSuccess={handleGoogleSuccess}
+            onError={(err) => {
+              setServerError(err);
+              setSuccessMessage('');
+            }}
+            disabled={isLoading}
+          />
           <div className="mt-6 text-center text-sm text-slate-600 border-t border-slate-100 pt-5 space-y-2">
             <div>
               Don't have an account?{' '}

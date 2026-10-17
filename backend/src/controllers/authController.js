@@ -4,6 +4,7 @@ import {
     registerUser,
     loginUser,
     activateCustomer,
+    authenticateGoogleUser,
     requestForgotPasswordOtp,
     resendForgotPasswordOtp,
     verifyForgotPasswordOtp,
@@ -248,11 +249,45 @@ const resetPassword = async (req, res) => {
     }
 };
 
+const googleAuth = async (req, res) => {
+    try {
+        const { credential, idToken, token, requestedRole } = req.body;
+        const tokenToVerify = credential || idToken || token;
+
+        if (!tokenToVerify) {
+            return res.status(400).json({
+                success: false,
+                message: "Google credential/token is required"
+            });
+        }
+
+        const result = await authenticateGoogleUser({
+            idToken: tokenToVerify,
+            requestedRole
+        });
+
+        res.status(result.status || 200).json({
+            success: true,
+            message: result.message,
+            isNewUser: result.isNewUser || false,
+            data: result.data
+        });
+    } catch (error) {
+        console.error("Google auth error:", error.message);
+        const status = error.statusCode || 401;
+        res.status(status).json({
+            success: false,
+            message: error.message || "Google authentication failed"
+        });
+    }
+};
+
 export {
     register,
     login,
     activateCustomerAccount,
     getCurrentUser,
+    googleAuth,
     forgotPassword,
     resendResetOtp,
     verifyResetOtp,
