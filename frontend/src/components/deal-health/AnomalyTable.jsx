@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertCircle, AlertOctagon } from 'lucide-react';
 
-export const AnomalyTable = ({ anomalies = [] }) => {
+export const AnomalyTable = ({ anomalies = [], onRowClick }) => {
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
@@ -40,7 +40,11 @@ export const AnomalyTable = ({ anomalies = [] }) => {
                 const isDiscountIssue = item.issue.toLowerCase().includes('discount');
 
                 return (
-                  <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                  <tr
+                    key={item.id}
+                    onClick={() => onRowClick && onRowClick(item)}
+                    className={`hover:bg-slate-50/70 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+                  >
                     <td className="py-4 pl-6 pr-3 font-semibold text-slate-900">
                       {item.deal}
                     </td>

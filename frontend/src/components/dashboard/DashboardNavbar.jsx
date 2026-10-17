@@ -31,6 +31,7 @@ const SALES_MANAGER_NAV_ITEMS = [
   { name: 'Dashboard', path: '/sales-manager-dashboard' },
   { name: 'Approval Queue', path: '/approvals' },
   { name: 'Quotations', path: '/quotations' },
+  { name: 'Deal Health', path: '/deal-health' },
 ];
 
 const FINANCE_OPERATIONS_NAV_ITEMS = [
