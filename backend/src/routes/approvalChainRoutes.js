@@ -1,0 +1,13 @@
+import express from "express";
+import * as controller from "../controllers/approvalChainController.js";
+import authenticateToken from "../middleware/authMiddleware.js";
+import requireAdmin from "../middleware/adminMiddleware.js";
+const router = express.Router();
+router.use(authenticateToken, requireAdmin);
+router.get("/", controller.list);
+router.get("/:id", controller.get);
+router.post("/", controller.create);
+router.put("/:id", controller.update);
+router.patch("/:id/deactivate", controller.deactivate);
+router.delete("/:id", controller.remove);
+export default router;
