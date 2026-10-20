@@ -191,13 +191,15 @@ export const getAllSubscriptions = async () => {
     return res.rows.map((r) => ({
         id: r.subscriptionId,
         dbId: r.id,
+        subscriptionId: r.subscriptionId,
         customer: r.customer,
         plan: r.plan,
         cycle: r.cycle,
         mrr: Number(r.mrr),
         mrrFormatted: `$${Number(r.mrr).toLocaleString()}`,
         status: r.status,
-        nextBilling: r.nextBilling || "Active"
+        nextBilling: r.nextBilling || "Active",
+        quotationId: r.quotationId
     }));
 };
 

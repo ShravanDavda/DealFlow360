@@ -84,7 +84,21 @@ const resolveApprovalChain = async (client, calculation) => {
         if (leftMax !== rightMax) return leftMax - rightMax;
         return Number(left.id) - Number(right.id) || String(left.name).localeCompare(String(right.name));
     })[0];
-    if (!chain) throw createApprovalError(`No active approval chain configured for ${calculation.blendedRisk} risk`, 400);
+
+    if (!chain) {
+        if (calculation.blendedRisk === "HIGH") {
+            const highFallback = (await loadChains(client))
+                .filter((c) => c.steps.length > 0 && String(c.minRisk || "").toUpperCase() === "HIGH")[0]
+                || (await loadChains(client)).filter((c) => c.steps.length > 0).sort((a, b) => b.steps.length - a.steps.length)[0];
+            if (highFallback) return highFallback;
+        } else if (calculation.blendedRisk === "MEDIUM") {
+            const medFallback = (await loadChains(client))
+                .filter((c) => c.steps.length > 0 && String(c.minRisk || "").toUpperCase() === "MEDIUM")[0]
+                || (await loadChains(client)).filter((c) => c.steps.length > 0)[0];
+            if (medFallback) return medFallback;
+        }
+        throw createApprovalError(`No active approval chain configured for ${calculation.blendedRisk} risk`, 400);
+    }
     return chain;
 };
 
@@ -252,7 +266,7 @@ export const getApprovalDetail = async (codeOrId) => {
     };
 };
 
-export const submitQuotation = async (codeOrId, userId) => {
+export const submitQuotation = async (codeOrId, userId, { items, note } = {}) => {
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
@@ -265,6 +279,64 @@ export const submitQuotation = async (codeOrId, userId) => {
             throw error;
         }
         if (!["Draft", "Returned", "Under Negotiation"].includes(quote.status)) throw createApprovalError("Quotation is not in a submittable state", 400);
+
+        if (Array.isArray(items) && items.length > 0) {
+            const itemCalc = await calculateQuotation({
+                client,
+                customerId: quote.customer_id,
+                priceListId: quote.price_list_id,
+                items
+            });
+
+            await client.query(
+                `UPDATE quotations
+                 SET subtotal = $1, total_discount = $2, tax_amount = $3,
+                     total_amount = $4, overall_margin = $5, blended_risk_score = $6,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $7`,
+                [
+                    itemCalc.subtotal,
+                    itemCalc.totalDiscount,
+                    itemCalc.taxAmount,
+                    itemCalc.totalAmount,
+                    itemCalc.overallMargin.toFixed(2),
+                    itemCalc.blendedRisk,
+                    quote.id
+                ]
+            );
+
+            await client.query("DELETE FROM quotation_items WHERE quotation_id = $1", [quote.id]);
+            for (const item of itemCalc.items) {
+                await client.query(
+                    `INSERT INTO quotation_items (
+                        quotation_id, product_id, product_variant_id, item_name, category_name,
+                        quantity, unit_price, base_cost, discount_percent, discount_limit,
+                        line_total, margin_percent, tax_percent, cgst_percent, sgst_percent, risk_status, is_recurring, recurring_cycle
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+                    [
+                        quote.id,
+                        item.productId,
+                        item.variantId,
+                        item.itemName,
+                        item.category,
+                        item.quantity,
+                        item.unitPrice,
+                        item.baseCost,
+                        item.discountPercent,
+                        item.discountLimit,
+                        item.lineTotal,
+                        item.marginPercent.toFixed(2),
+                        item.taxPercent,
+                        item.cgstPercent,
+                        item.sgstPercent,
+                        item.riskStatus,
+                        item.isRecurring,
+                        item.recurringCycle || null
+                    ]
+                );
+            }
+        }
+
         const itemResult = await client.query(`SELECT product_id AS "productId", product_variant_id AS "productVariantId", quantity, discount_percent AS "discountPercent" FROM quotation_items WHERE quotation_id = $1 ORDER BY id`, [quote.id]);
         const calculation = await calculateQuotation({ client, customerId: quote.customer_id, priceListId: quote.price_list_id, items: itemResult.rows });
         const chain = await resolveApprovalChain(client, calculation);
@@ -273,9 +345,9 @@ export const submitQuotation = async (codeOrId, userId) => {
         await client.query(`UPDATE quotations SET status = $1, approval_stage = $2, blended_risk_score = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`, [nextStatus, nextStage, calculation.blendedRisk, quote.id]);
         if (chain) {
             await createApprovalCycle(client, { quote, calculation, submittedBy: userId });
-            await addAudit(client, { quotationId: quote.id, userId, user, action: "APPROVAL_STARTED", note: `Approval chain: ${chain.name}`, previousStatus: quote.status, newStatus: nextStatus });
+            await addAudit(client, { quotationId: quote.id, userId, user, action: "APPROVAL_STARTED", note: note ? `${note} (Chain: ${chain.name})` : `Approval chain: ${chain.name}`, previousStatus: quote.status, newStatus: nextStatus });
         } else {
-            await addAudit(client, { quotationId: quote.id, userId, user, action: "QUOTATION_APPROVED", note: "No approval chain required", previousStatus: quote.status, newStatus: nextStatus });
+            await addAudit(client, { quotationId: quote.id, userId, user, action: "QUOTATION_APPROVED", note: note || "No approval chain required", previousStatus: quote.status, newStatus: nextStatus });
         }
         await addAudit(client, { quotationId: quote.id, userId, user, action: "QUOTATION_SUBMITTED", note: `Risk: ${calculation.blendedRisk}`, previousStatus: quote.status, newStatus: nextStatus });
         await client.query("COMMIT");

@@ -173,6 +173,14 @@ export const getFulfillmentDetail = async (orderCodeOrId) => {
             quantityFulfilled: Number(s.quantityFulfilled),
             estimatedShipments: Number(s.estimatedShipments || 1),
             cost: Number(s.cost || 0)
+        })),
+        splits: splits.map((s, idx) => ({
+            id: `SPLIT-${s.id || idx + 1}`,
+            dbId: s.id,
+            warehouse: s.warehouse,
+            quantityFulfilled: Number(s.quantityFulfilled),
+            estimatedShipments: Number(s.estimatedShipments || 1),
+            cost: Number(s.cost || 0)
         }))
     };
 };

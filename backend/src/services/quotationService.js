@@ -49,7 +49,16 @@ export const calculateBlendedRisk = (items = []) => {
 };
 
 export const previewQuotation = async ({ customerId, priceListId, items = [] }) => {
-    return calculateQuotation({ customerId, priceListId, items });
+    const chainRows = await pool.query(`
+        SELECT ac.id, ac.name, ac.min_discount_percent AS "minDiscountPercent", ac.max_discount_percent AS "maxDiscountPercent",
+               ac.min_risk AS "minRisk", ac.is_active AS "isActive",
+               COALESCE(json_agg(json_build_object('id', s.id, 'stepOrder', s.step_order, 'approverRole', s.approver_role) ORDER BY s.step_order) FILTER (WHERE s.id IS NOT NULL), '[]'::json) AS steps
+        FROM approval_chains ac
+        LEFT JOIN approval_chain_steps s ON s.approval_chain_id = ac.id
+        WHERE ac.is_active = TRUE
+        GROUP BY ac.id
+    `);
+    return calculateQuotation({ customerId, priceListId, items, approvalChains: chainRows.rows });
 };
 
 export const getAllQuotations = async ({ status, ownerId, ownerRole, customerId } = {}) => {
@@ -278,17 +287,23 @@ export const createQuotation = async ({ customerId, userId, priceListId, items =
         const userNameRes = await client.query(`SELECT COALESCE(NULLIF(CONCAT(first_name, ' ', last_name), ' '), username) AS name FROM users WHERE id = $1`, [userId]);
         const userName = userNameRes.rows[0]?.name || "User";
 
+        const nextIdRes = await client.query("SELECT nextval('quotations_id_seq') AS id");
+        const nextId = Number(nextIdRes.rows[0].id);
+        const quoteCode = `Q-${nextId}`;
+
         const quoteInsert = await client.query(
             `
             INSERT INTO quotations (
-                quote_code, customer_id, user_id, price_list_id,
+                id, quote_code, customer_id, user_id, price_list_id,
                 status, subtotal, total_discount, tax_amount, total_amount,
                 overall_margin, blended_risk_score, approval_stage
             )
-            VALUES ('Q-' || nextval('quotations_id_seq'), $1, $2, $3, 'Draft', $4, $5, $6, $7, $8, $9, 'None')
+            VALUES ($1, $2, $3, $4, $5, 'Draft', $6, $7, $8, $9, $10, $11, 'None')
             RETURNING *
             `,
             [
+                nextId,
+                quoteCode,
                 customerId,
                 userId,
                 priceListId,

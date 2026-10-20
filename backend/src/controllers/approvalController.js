@@ -94,7 +94,7 @@ export const getApproval = async (req, res, next) => {
 
 export const submit = async (req, res, next) => {
     try {
-        const result = await approvalService.submitQuotation(req.params.quotationId, req.user.userId);
+        const result = await approvalService.submitQuotation(req.params.quotationId, req.user.userId, req.body);
         res.status(200).json({ success: true, message: "Quotation submitted", data: result });
     } catch (err) { next(err); }
 };

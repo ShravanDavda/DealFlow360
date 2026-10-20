@@ -87,7 +87,7 @@ export const previewQuotation = async (req, res, next) => {
 export const submitQuotation = async (req, res, next) => {
     try {
         const { quotationId } = req.params;
-        const quote = await approvalService.submitQuotation(quotationId, req.user.userId);
+        const quote = await approvalService.submitQuotation(quotationId, req.user.userId, req.body);
 
         res.status(200).json({
             success: true,

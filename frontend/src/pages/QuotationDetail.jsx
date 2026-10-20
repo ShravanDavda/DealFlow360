@@ -145,11 +145,24 @@ export const QuotationDetail = () => {
   const handleSubmitForApproval = async () => {
     try {
       setIsSubmitting(true);
+      const formattedItems = products.map((item) => ({
+        productId: item.productId,
+        productVariantId: item.productVariantId || null,
+        quantity: Number(item.quantity),
+        discountPercent: Number(item.discount ?? item.discountPercent ?? item.discountGiven ?? 0)
+      }));
+
+      // Ensure updated products and discount rates are saved before submitting
+      await updateQuotation(quotationId, {
+        items: formattedItems
+      });
+
       const result = await submitQuotation(quotationId, {
+        items: formattedItems,
         note: `Submitted with ${totals.blendedRisk} Risk rating`
       });
 
-      if (result?.status === 'Pending Approval') {
+      if (result?.status === 'Pending Approval' || result?.status === 'Pending') {
         setFeedbackMessage(
           `Quotation submitted! Auto-routed to ${result.approvalStage} for approval due to ${totals.blendedRisk} blended risk.`
         );

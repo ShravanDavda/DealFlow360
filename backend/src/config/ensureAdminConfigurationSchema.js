@@ -38,6 +38,15 @@ const ensureAdminConfigurationSchema = async () => {
         END IF;
     END $$;
 
+    DO $$
+    DECLARE max_qid BIGINT;
+    BEGIN
+        SELECT GREATEST(5000, COALESCE(MAX(id), 0) + 1) INTO max_qid FROM quotations;
+        IF (SELECT last_value FROM quotations_id_seq) < max_qid THEN
+            PERFORM setval('quotations_id_seq', max_qid, TRUE);
+        END IF;
+    END $$;
+
         CREATE TABLE IF NOT EXISTS approval_chains (
             id SERIAL PRIMARY KEY,
             name VARCHAR(100) NOT NULL UNIQUE,
