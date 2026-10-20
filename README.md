@@ -2,6 +2,28 @@
 
 ### Sales Operations & Deal Management Platform
 
+[![Live Application](https://img.shields.io/badge/Live%20App-dealflow360--frontend.onrender.com-brightgreen?style=for-the-badge&logo=render)](https://dealflow360-frontend.onrender.com/)
+[![Backend API](https://img.shields.io/badge/API-dealflow360--backend--48n8.onrender.com-blue?style=for-the-badge)](https://dealflow360-backend-48n8.onrender.com/api/health)
+
+---
+
+## 🌐 Live Production Links
+
+- **🚀 Live Web Application**: [https://dealflow360-frontend.onrender.com](https://dealflow360-frontend.onrender.com/)
+- **⚡ Backend REST API**: [https://dealflow360-backend-48n8.onrender.com/api](https://dealflow360-backend-48n8.onrender.com/api)
+- **🩺 API Health Endpoint**: [https://dealflow360-backend-48n8.onrender.com/api/health](https://dealflow360-backend-48n8.onrender.com/api/health)
+
+### 🔑 Pre-Configured Demo Accounts (All passwords: `password123`)
+
+| Role | Email | Password | Dashboard Features |
+| :--- | :--- | :--- | :--- |
+| **Sales Rep** | `salesrep1@dealflow360.com` | `password123` | Quotation Builder, Customer Pipeline, Margin Preview |
+| **Sales Manager** | `manager@dealflow360.com` | `password123` | Approval Queue, Risk Scoring, Nudge/Escalate Actions |
+| **Finance** | `finance@dealflow360.com` | `password123` | Multi-tier High Risk Approvals, Invoice Billing, Payments |
+| **Admin** | `admin@dealflow360.com` | `password123` | Master Catalogs, Approval Chains, Warehouse Splits |
+
+---
+
 DealFlow360 is a full-stack sales operations platform designed to centralize deal management, user workflows, and role-based business operations in a single application.
 
 The project is built with a modern React frontend and a Node.js/Express backend backed by PostgreSQL, with authentication (Email/Password, Google OAuth 2.0, and Password Recovery via Email OTP) and API-driven communication between the client and server.
