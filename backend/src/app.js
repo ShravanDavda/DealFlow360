@@ -58,11 +58,25 @@ app.use(
     })
 );
 
+app.get("/health", (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: "DealFlow360 API is running"
+    });
+});
+
 app.get("/api/health", (req, res) => {
     res.status(200).json({
         success: true,
         message: "DealFlow360 API is running"
     });
+});
+
+app.use((req, res, next) => {
+    if (!req.url.startsWith("/api") && req.url !== "/") {
+        req.url = `/api${req.url}`;
+    }
+    next();
 });
 
 app.use("/api/auth", authRoutes);
