@@ -39,9 +39,15 @@ app.use(
 
             const configuredOrigin = process.env.FRONTEND_URL;
             if (
+                !configuredOrigin ||
+                configuredOrigin === "*" ||
                 (configuredOrigin && origin === configuredOrigin) ||
+                (configuredOrigin && configuredOrigin.split(",").map((s) => s.trim().replace(/\/$/, "")).includes(origin.replace(/\/$/, ""))) ||
                 origin.startsWith("http://localhost:") ||
-                origin.startsWith("http://127.0.0.1:")
+                origin.startsWith("http://127.0.0.1:") ||
+                origin.endsWith(".vercel.app") ||
+                origin.endsWith(".netlify.app") ||
+                origin.endsWith(".onrender.com")
             ) {
                 return callback(null, true);
             }
