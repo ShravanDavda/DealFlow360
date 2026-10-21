@@ -1,0 +1,311 @@
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { 
+  User, 
+  Mail, 
+  Eye, 
+  EyeOff, 
+  AlertCircle, 
+  CheckCircle2, 
+  ShieldCheck 
+} from 'lucide-react';
+import { Input } from '../components/ui/Input';
+import { Button } from '../components/ui/Button';
+import { registerUser } from '../services/authService';
+import { GoogleAuthButton } from '../components/auth/GoogleAuthButton';
+
+export const Register = () => {
+  const navigate = useNavigate();
+
+  const handleGoogleRegisterSuccess = (response) => {
+    setServerError('');
+    if (response?.token) {
+      localStorage.setItem('token', response.token);
+      const userRole = response?.data?.user?.role;
+      navigate(
+        userRole === 'admin'
+          ? '/admin-dashboard'
+          : userRole === 'sales_rep'
+          ? '/sales-rep-dashboard'
+          : userRole === 'sales_manager'
+          ? '/sales-manager-dashboard'
+          : userRole === 'customer'
+          ? '/customer/quotes'
+          : '/dashboard',
+        { replace: true }
+      );
+    } else {
+      setSuccessMessage('Registration submitted with Google. An administrator must approve your requested role before you can sign in.');
+      setFormData({ username: '', email: '', role: '', password: '' });
+    }
+  };
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    role: '',
+    password: '',
+  });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [serverError, setServerError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!formData.username.trim()) {
+      newErrors.username = 'Username is required';
+    } else if (formData.username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email address is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    if (!formData.role) {
+      newErrors.role = 'Role is required';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: '',
+      }));
+    }
+    if (serverError) setServerError('');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setServerError('');
+    setSuccessMessage('');
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await registerUser({
+        username: formData.username.trim(),
+        email: formData.email.trim(),
+        role: formData.role,
+        password: formData.password,
+      });
+
+      setSuccessMessage('Registration submitted. An administrator must approve your requested role before you can sign in.');
+      setFormData({ username: '', email: '', role: '', password: '' });
+    } catch (err) {
+      setServerError(err.message || 'Registration failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-50">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="flex justify-center">
+          <div className="h-11 w-11 rounded-lg bg-slate-900 flex items-center justify-center text-white shadow-md">
+            <ShieldCheck className="h-6 w-6" />
+          </div>
+        </div>
+        <h2 className="mt-5 text-center text-2xl font-bold tracking-tight text-slate-900">
+          Create your account
+        </h2>
+        <p className="mt-1.5 text-center text-sm text-slate-600">
+          Enter your details below to get started with your workspace
+        </p>
+      </div>
+
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white py-8 px-6 shadow-sm border border-slate-200 rounded-lg sm:px-10">
+          
+          {serverError && (
+            <div className="mb-5 p-3.5 rounded-md bg-red-50 border border-red-200 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
+              <div className="text-sm text-red-700 font-medium">
+                {serverError}
+              </div>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="mb-5 p-3.5 rounded-md bg-emerald-50 border border-emerald-200 flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
+              <div className="text-sm text-emerald-700 font-medium">
+                {successMessage}
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+            
+            <div>
+              <div className="relative">
+                <Input
+                  id="username"
+                  name="username"
+                  type="text"
+                  label="Username"
+                  placeholder="e.g. rahul123"
+                  value={formData.username}
+                  onChange={handleChange}
+                  error={errors.username}
+                  autoComplete="username"
+                  required
+                />
+                <div className="absolute right-3 top-9 text-slate-400 pointer-events-none">
+                  <User className="h-4 w-4" />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="relative">
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  label="Email address"
+                  placeholder="name@company.com"
+                  value={formData.email}
+                  onChange={handleChange}
+                  error={errors.email}
+                  autoComplete="email"
+                  required
+                />
+                <div className="absolute right-3 top-9 text-slate-400 pointer-events-none">
+                  <Mail className="h-4 w-4" />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="role" className="block text-sm font-medium text-slate-700">
+                Role
+              </label>
+              <select
+                id="role"
+                name="role"
+                value={formData.role}
+                onChange={handleChange}
+                className={`mt-1.5 w-full rounded-md border bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent ${
+                  errors.role ? 'border-red-500 focus:ring-red-500' : 'border-slate-300 hover:border-slate-400'
+                }`}
+                required
+              >
+                <option value="" disabled>Select a role</option>
+                <option value="sales_rep">Sales representative</option>
+                <option value="finance">Finance/Operator</option>
+                <option value="sales_manager">SalesManager</option>
+              </select>
+              {errors.role && (
+                <p className="mt-1.5 text-xs text-red-600 font-medium">
+                  {errors.role}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  label="Password"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={handleChange}
+                  error={errors.password}
+                  autoComplete="new-password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-9 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                Must be at least 6 characters long
+              </p>
+            </div>
+
+            <div className="pt-1">
+              <Button
+                type="submit"
+                variant="primary"
+                isLoading={isLoading}
+              >
+                Create account
+              </Button>
+            </div>
+          </form>
+
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-slate-500 font-medium">Or sign up with</span>
+            </div>
+          </div>
+
+          <GoogleAuthButton
+            buttonText="Sign up with Google"
+            requestedRole={formData.role || undefined}
+            username={formData.username || undefined}
+            onSuccess={handleGoogleRegisterSuccess}
+            onError={(err) => {
+              setServerError(err);
+              setSuccessMessage('');
+            }}
+            disabled={isLoading}
+          />
+          <div className="mt-6 text-center text-sm text-slate-600 border-t border-slate-100 pt-5">
+            Already have an account?{' '}
+            <Link 
+              to="/login" 
+              className="font-medium text-slate-900 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-900 rounded"
+            >
+              Sign in
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Register;
