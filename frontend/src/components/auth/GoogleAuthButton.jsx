@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { loginWithGoogle } from '../../services/authService';
+import { GoogleProfileCompletionModal } from './GoogleProfileCompletionModal';
 
 export const GoogleAuthButton = ({
   onSuccess,
   onError,
   requestedRole,
+  username,
   buttonText = 'Sign in with Google',
   disabled = false,
   className = '',
@@ -14,6 +16,11 @@ export const GoogleAuthButton = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGisReady, setIsGisReady] = useState(false);
 
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [pendingCredential, setPendingCredential] = useState(null);
+  const [profileModalError, setProfileModalError] = useState('');
+  const [isModalSubmitting, setIsModalSubmitting] = useState(false);
+
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const isClientIdConfigured =
     Boolean(clientId) &&
@@ -21,7 +28,7 @@ export const GoogleAuthButton = ({
     clientId.includes('.apps.googleusercontent.com');
 
   const handleCredentialResponse = async (response) => {
-    if (isSubmitting) return;
+    if (isSubmitting || isModalSubmitting) return;
 
     if (!response || !response.credential) {
       if (onError) {
@@ -30,24 +37,101 @@ export const GoogleAuthButton = ({
       return;
     }
 
+    const credential = response.credential;
+
+    // If both username and role are already provided, attempt immediate registration
+    if (requestedRole && username && username.trim()) {
+      setIsSubmitting(true);
+      try {
+        const payload = {
+          credential,
+          requestedRole,
+          username: username.trim(),
+        };
+
+        const result = await loginWithGoogle(payload);
+        if (onSuccess) {
+          onSuccess(result);
+        }
+        return;
+      } catch (err) {
+        // If profile completion / validation error occurred, open modal with error message
+        if (
+          err?.data?.needsProfileCompletion ||
+          err?.message?.toLowerCase().includes('username') ||
+          err?.message?.toLowerCase().includes('role')
+        ) {
+          setPendingCredential(credential);
+          setProfileModalError(err.message || '');
+          setIsProfileModalOpen(true);
+          return;
+        }
+        if (onError) {
+          onError(err.message || 'Google authentication failed. Please try again.');
+        }
+        return;
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+
+    // Otherwise, first attempt direct sign-in for existing Google users
     setIsSubmitting(true);
     try {
-      const payload = {
-        credential: response.credential,
-        ...(requestedRole ? { requestedRole } : {}),
-      };
-
-      const result = await loginWithGoogle(payload);
+      const result = await loginWithGoogle({ credential });
       if (onSuccess) {
         onSuccess(result);
       }
     } catch (err) {
-      if (onError) {
-        onError(err.message || 'Google authentication failed. Please try again.');
+      // Check if error is because this is a new user needing profile completion (role / username required)
+      if (
+        err?.data?.needsProfileCompletion ||
+        err?.message?.toLowerCase().includes('role is required') ||
+        err?.message?.toLowerCase().includes('username is required')
+      ) {
+        setPendingCredential(credential);
+        setProfileModalError('');
+        setIsProfileModalOpen(true);
+      } else {
+        if (onError) {
+          onError(err.message || 'Google authentication failed. Please try again.');
+        }
       }
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleProfileModalSubmit = async ({ username: submittedUsername, role: submittedRole }) => {
+    if (!pendingCredential || isModalSubmitting) return;
+
+    setIsModalSubmitting(true);
+    setProfileModalError('');
+
+    try {
+      const payload = {
+        credential: pendingCredential,
+        requestedRole: submittedRole,
+        username: submittedUsername,
+      };
+
+      const result = await loginWithGoogle(payload);
+      setIsProfileModalOpen(false);
+      setPendingCredential(null);
+      if (onSuccess) {
+        onSuccess(result);
+      }
+    } catch (err) {
+      setProfileModalError(err.message || 'Failed to complete registration. Please try again.');
+    } finally {
+      setIsModalSubmitting(false);
+    }
+  };
+
+  const handleProfileModalClose = () => {
+    setIsProfileModalOpen(false);
+    setPendingCredential(null);
+    setProfileModalError('');
   };
 
   useEffect(() => {
@@ -96,10 +180,10 @@ export const GoogleAuthButton = ({
     return () => {
       if (checkInterval) clearInterval(checkInterval);
     };
-  }, [clientId, isClientIdConfigured, requestedRole, buttonText]);
+  }, [clientId, isClientIdConfigured, requestedRole, username, buttonText]);
 
   const handleManualClick = () => {
-    if (disabled || isSubmitting) return;
+    if (disabled || isSubmitting || isModalSubmitting) return;
 
     if (!isClientIdConfigured) {
       if (onError) {
@@ -141,7 +225,7 @@ export const GoogleAuthButton = ({
         <button
           type="button"
           onClick={handleManualClick}
-          disabled={disabled || isSubmitting}
+          disabled={disabled || isSubmitting || isModalSubmitting}
           className="w-full h-10 px-4 py-2 border border-slate-300 rounded-md bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 flex items-center justify-center shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (
@@ -174,6 +258,17 @@ export const GoogleAuthButton = ({
           )}
         </button>
       )}
+
+      {/* Profile Completion Modal for Google first-time registration */}
+      <GoogleProfileCompletionModal
+        isOpen={isProfileModalOpen}
+        onClose={handleProfileModalClose}
+        onSubmit={handleProfileModalSubmit}
+        initialUsername={username || ''}
+        initialRole={requestedRole || ''}
+        isLoading={isModalSubmitting}
+        serverError={profileModalError}
+      />
     </div>
   );
 };

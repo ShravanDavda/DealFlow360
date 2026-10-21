@@ -251,7 +251,7 @@ const resetPassword = async (req, res) => {
 
 const googleAuth = async (req, res) => {
     try {
-        const { credential, idToken, token, requestedRole } = req.body;
+        const { credential, idToken, token, requestedRole, role, username } = req.body;
         const tokenToVerify = credential || idToken || token;
 
         if (!tokenToVerify) {
@@ -263,7 +263,8 @@ const googleAuth = async (req, res) => {
 
         const result = await authenticateGoogleUser({
             idToken: tokenToVerify,
-            requestedRole
+            requestedRole: requestedRole || role,
+            username
         });
 
         res.status(result.status || 200).json({
@@ -277,7 +278,8 @@ const googleAuth = async (req, res) => {
         const status = error.statusCode || 401;
         res.status(status).json({
             success: false,
-            message: error.message || "Google authentication failed"
+            message: error.message || "Google authentication failed",
+            needsProfileCompletion: error.needsProfileCompletion || false
         });
     }
 };

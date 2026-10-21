@@ -285,6 +285,7 @@ export const Register = () => {
           <GoogleAuthButton
             buttonText="Sign up with Google"
             requestedRole={formData.role || undefined}
+            username={formData.username || undefined}
             onSuccess={handleGoogleRegisterSuccess}
             onError={(err) => {
               setServerError(err);

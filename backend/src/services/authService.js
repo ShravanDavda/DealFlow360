@@ -414,20 +414,18 @@ const verifyGoogleToken = async (idToken) => {
     }
 };
 
-const authenticateGoogleUser = async ({ idToken, requestedRole }) => {
+const authenticateGoogleUser = async ({ idToken, requestedRole, role, username }) => {
     const googleUser = await verifyGoogleToken(idToken);
     const { googleId, email, firstName, lastName } = googleUser;
 
-    const allowedRequestedRoles = new Set(["sales_rep", "sales_manager", "finance", "operations"]);
-    let targetRequestedRole = "sales_rep";
+    const ALLOWED_STAFF_ROLES = new Set(["sales_rep", "finance", "sales_manager"]);
+    const submittedRole = (typeof requestedRole === "string" ? requestedRole : typeof role === "string" ? role : "").trim();
 
-    if (requestedRole) {
-        if (!allowedRequestedRoles.has(requestedRole)) {
-            const err = new Error("Invalid requested role. Permitted roles are: sales_rep, sales_manager, finance, operations");
-            err.statusCode = 400;
-            throw err;
-        }
-        targetRequestedRole = requestedRole;
+    // If a role was provided (e.g. from an existing or new user submission), validate against the strict staff allowlist
+    if (submittedRole && !ALLOWED_STAFF_ROLES.has(submittedRole)) {
+        const err = new Error("Invalid requested role. Permitted roles are: sales_rep, finance, sales_manager");
+        err.statusCode = 400;
+        throw err;
     }
 
     // 1. Check for existing user by google_id
@@ -553,13 +551,54 @@ const authenticateGoogleUser = async ({ idToken, requestedRole }) => {
         throw err;
     }
 
-    // 5. Genuine new user registration via Google
-    const baseUsername = email.split("@")[0].replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 40) || "user";
-    let username = baseUsername;
-    let suffix = 1;
-    while ((await pool.query("SELECT 1 FROM users WHERE username = $1", [username])).rows.length > 0) {
-        username = `${baseUsername.slice(0, 40 - String(suffix).length)}_${suffix}`;
-        suffix += 1;
+    // 5. Genuine new user registration via Google — requires valid role and username
+    if (!submittedRole) {
+        const err = new Error("Role is required. Permitted roles are: sales_rep, finance, sales_manager");
+        err.statusCode = 400;
+        err.needsProfileCompletion = true;
+        throw err;
+    }
+
+    if (!ALLOWED_STAFF_ROLES.has(submittedRole)) {
+        const err = new Error("Invalid requested role. Permitted roles are: sales_rep, finance, sales_manager");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const normalizedUsername = (typeof username === "string" ? username : "").trim();
+    if (!normalizedUsername) {
+        const err = new Error("Username is required");
+        err.statusCode = 400;
+        err.needsProfileCompletion = true;
+        throw err;
+    }
+
+    if (normalizedUsername.length < 3) {
+        const err = new Error("Username must be at least 3 characters");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    if (normalizedUsername.length > 50) {
+        const err = new Error("Username must not exceed 50 characters");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    if (!/^[a-zA-Z0-9_.-]+$/.test(normalizedUsername)) {
+        const err = new Error("Username can only contain letters, numbers, underscores, periods, and hyphens");
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const existingUsername = await pool.query(
+        "SELECT id FROM users WHERE LOWER(username) = LOWER($1)",
+        [normalizedUsername]
+    );
+    if (existingUsername.rows.length > 0) {
+        const err = new Error("Username is already taken");
+        err.statusCode = 400;
+        throw err;
     }
 
     // Secure cryptographically random password hash to satisfy schema requirements without predictable password
@@ -594,11 +633,11 @@ const authenticateGoogleUser = async ({ idToken, requestedRole }) => {
                 registration_status AS "registrationStatus",
                 created_at AS "createdAt"`,
             [
-                username,
+                normalizedUsername,
                 email,
                 googleId,
                 passwordHash,
-                targetRequestedRole,
+                submittedRole,
                 firstName || null,
                 lastName || null
             ]
@@ -613,6 +652,11 @@ const authenticateGoogleUser = async ({ idToken, requestedRole }) => {
         };
     } catch (dbError) {
         if (dbError.code === "23505") {
+            if (dbError.constraint && dbError.constraint.includes("username")) {
+                const err = new Error("Username is already taken");
+                err.statusCode = 400;
+                throw err;
+            }
             const err = new Error("An account with this email or Google identity already exists");
             err.statusCode = 409;
             throw err;
