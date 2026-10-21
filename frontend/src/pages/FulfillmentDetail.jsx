@@ -11,6 +11,7 @@ import {
   manualOverride,
   consolidateBackorder
 } from '../services/fulfillmentService';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 export const FulfillmentDetail = () => {
   const { orderId } = useParams();
@@ -132,7 +133,7 @@ export const FulfillmentDetail = () => {
               Status: {orderDetail?.status || 'Pending Split'}
             </span>
             <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-              Shipments: {orderDetail?.totalShipments || splits.length} (Est Cost: ${orderDetail?.totalCost || 0})
+              Shipments: {orderDetail?.totalShipments || splits.length} (Est Cost: {formatCurrency(orderDetail?.totalCost || 0)})
             </span>
           </div>
         </div>

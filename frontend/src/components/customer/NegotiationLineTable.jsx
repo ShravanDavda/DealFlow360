@@ -33,7 +33,7 @@ export const NegotiationLineTable = ({ lines = [] }) => {
                     <div className="flex items-start gap-2 bg-slate-50/80 rounded-md p-3 border border-slate-200/80">
                       <MessageSquareText className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
                       <span className="text-sm text-slate-800 leading-relaxed">
-                        {item.customerComment}
+                        {item.message || item.customerComment}
                       </span>
                     </div>
                   </td>

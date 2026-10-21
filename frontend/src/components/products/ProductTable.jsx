@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 const CATEGORY_STYLES = {
   Hardware: 'bg-slate-100 text-slate-700 border-slate-200',
@@ -63,7 +64,7 @@ export const ProductTable = ({ products = [], onRowClick }) => {
                     }}
                     tabIndex={0}
                     role="button"
-                    aria-label={`Open product detail for ${prod.name}, category ${prod.category}, price ${prod.priceFormatted || prod.price}`}
+                    aria-label={`Open product detail for ${prod.name}, category ${prod.category}, price ${formatCurrency(prod.priceFormatted || prod.price)}`}
                     className="hover:bg-slate-50 focus:bg-slate-50 focus:outline-none cursor-pointer transition-colors group"
                   >
                     <td className="py-4 pl-6 pr-3 font-semibold text-slate-900">
@@ -78,7 +79,7 @@ export const ProductTable = ({ products = [], onRowClick }) => {
                       {prod.variants}
                     </td>
                     <td className="px-3 py-4 font-semibold text-slate-900">
-                      {prod.priceFormatted || prod.price}
+                      {formatCurrency(prod.priceFormatted || prod.price)}
                     </td>
                     <td className="px-3 py-4 text-slate-600">
                       {prod.unit}

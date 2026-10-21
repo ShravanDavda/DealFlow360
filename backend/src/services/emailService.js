@@ -100,3 +100,43 @@ export const sendCustomerActivationEmail = async ({
     return { emailSent: false };
   }
 };
+
+export const sendWorkflowNotificationEmail = async ({
+  email,
+  subject,
+  title,
+  message,
+  link,
+}) => {
+  try {
+    if (!process.env.BREVO_API_KEY || !process.env.BREVO_SENDER_EMAIL || !email) {
+      return { emailSent: false };
+    }
+    const response = await fetch(BREVO_API_URL, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "api-key": process.env.BREVO_API_KEY,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: {
+          email: process.env.BREVO_SENDER_EMAIL,
+          name: process.env.BREVO_SENDER_NAME || "DealFlow360",
+        },
+        to: [{ email }],
+        subject: subject || title,
+        htmlContent: `
+          <div>
+            <h2>${title}</h2>
+            <p>${message}</p>
+            ${link ? `<p><a href="${link}">View details in DealFlow360</a></p>` : ""}
+          </div>
+        `,
+      }),
+    });
+    return { emailSent: response.ok };
+  } catch (error) {
+    return { emailSent: false };
+  }
+};

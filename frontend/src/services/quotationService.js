@@ -34,3 +34,13 @@ export const getRecommendations = async (quotationId) => {
   const response = await api.get(`/quotations/${quotationId}/recommendations`);
   return response.data?.data || [];
 };
+
+export const getQuotationMessages = async (quotationId) => {
+  const response = await api.get(`/quotations/${quotationId}/messages`);
+  return response.data?.data || [];
+};
+
+export const sendQuotationMessage = async (quotationId, message) => {
+  const response = await api.post(`/quotations/${quotationId}/messages`, { message });
+  return response.data?.data || null;
+};

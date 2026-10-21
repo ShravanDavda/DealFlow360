@@ -12,6 +12,7 @@ import {
 import { CustomerNavbar } from '../components/customer/CustomerNavbar';
 import { Button } from '../components/ui/Button';
 import { getCustomerQuotes } from '../services/customerPortalService';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 export const CustomerQuotations = () => {
   const navigate = useNavigate();
@@ -212,10 +213,10 @@ export const CustomerQuotations = () => {
                         {q.itemCount}
                       </td>
                       <td className="px-6 py-4 text-right text-slate-600 whitespace-nowrap">
-                        ${Number(q.totalDiscount || 0).toLocaleString()}
+                        {formatCurrency(q.totalDiscount)}
                       </td>
                       <td className="px-6 py-4 text-right font-bold text-slate-900 whitespace-nowrap">
-                        ${Number(q.totalAmount || 0).toLocaleString()} {q.currency}
+                        {formatCurrency(q.totalAmount)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span

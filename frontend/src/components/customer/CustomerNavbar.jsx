@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShieldCheck, Menu, X, MessageSquare, User, FileText, LogOut } from 'lucide-react';
 import { getCurrentUser } from '../../services/authService';
+import { NotificationBell } from '../common/NotificationBell';
 
 export const CustomerNavbar = ({ quoteId }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -64,6 +65,8 @@ export const CustomerNavbar = ({ quoteId }) => {
               <span>My Quotations</span>
             </NavLink>
 
+            <NotificationBell />
+
             {currentUser && (
               <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-500 border-l border-slate-200 ml-2">
                 <User className="h-3.5 w-3.5 text-slate-400" />
@@ -82,7 +85,8 @@ export const CustomerNavbar = ({ quoteId }) => {
             </button>
           </nav>
 
-          <div className="md:hidden flex items-center">
+          <div className="md:hidden flex items-center gap-1">
+            <NotificationBell />
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen((prev) => !prev)}

@@ -115,3 +115,50 @@ export const getRecommendations = async (req, res, next) => {
         next(err);
     }
 };
+
+export const addMessage = async (req, res, next) => {
+    try {
+        const { quotationId } = req.params;
+        const messageText = req.body?.message || req.body?.comment || req.body?.customerComment;
+        const userId = req.user?.userId || req.user?.id;
+        const role = req.user?.role;
+        const customerId = req.user?.customerId;
+        const name = req.user?.name || req.user?.username;
+
+        const messageRecord = await quotationService.addQuotationMessage(
+            quotationId,
+            { userId, role, name, customerId },
+            messageText
+        );
+
+        res.status(201).json({
+            success: true,
+            message: "Message sent successfully",
+            data: messageRecord
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getMessages = async (req, res, next) => {
+    try {
+        const { quotationId } = req.params;
+        const userId = req.user?.userId || req.user?.id;
+        const role = req.user?.role;
+        const customerId = req.user?.customerId;
+
+        const messages = await quotationService.getQuotationMessages(
+            quotationId,
+            { userId, role, customerId }
+        );
+
+        res.status(200).json({
+            success: true,
+            count: messages.length,
+            data: messages
+        });
+    } catch (err) {
+        next(err);
+    }
+};

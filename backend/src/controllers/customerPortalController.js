@@ -59,11 +59,18 @@ export const submitNegotiation = async (req, res, next) => {
         const { quoteId } = req.params;
         const customerId = req.user?.customerId;
         const role = req.user?.role;
+        const userId = req.user?.userId || req.user?.id;
+        const userName = req.user?.name || req.user?.username;
         const result = await customerPortalService.submitCustomerNegotiation(
             quoteId,
             customerId,
             role,
-            req.body
+            {
+                ...req.body,
+                senderId: userId,
+                senderRole: role || "customer",
+                senderName: userName
+            }
         );
         res.status(200).json({
             success: true,

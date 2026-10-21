@@ -1,6 +1,7 @@
 import pool from "../config/db.js";
 import { calculateQuotation } from "./quotationCalculationService.js";
 import { getQuotationByCodeOrId } from "./quotationService.js";
+import { createNotification, notifyStageApprovers } from "./notificationService.js";
 
 const normalizeRole = (role) => String(role || "").trim().toLowerCase().replace(/-/g, "_").replace(/\s+/g, "_");
 const normalizeApproverRole = (role) => {
@@ -110,6 +111,15 @@ export const createApprovalCycle = async (client, { quote, calculation, submitte
         `UPDATE quotation_approval_requests
          SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP
          WHERE quotation_id = $1 AND status IN ('PENDING', 'RETURNED')`,
+        [quote.id]
+    );
+
+    await client.query(
+        `UPDATE quotation_approval_steps
+         SET status = 'SKIPPED'
+         WHERE approval_request_id IN (
+             SELECT id FROM quotation_approval_requests WHERE quotation_id = $1 AND status = 'CANCELLED'
+         ) AND status IN ('PENDING', 'WAITING')`,
         [quote.id]
     );
 
@@ -346,6 +356,14 @@ export const submitQuotation = async (codeOrId, userId, { items, note } = {}) =>
         if (chain) {
             await createApprovalCycle(client, { quote, calculation, submittedBy: userId });
             await addAudit(client, { quotationId: quote.id, userId, user, action: "APPROVAL_STARTED", note: note ? `${note} (Chain: ${chain.name})` : `Approval chain: ${chain.name}`, previousStatus: quote.status, newStatus: nextStatus });
+            await notifyStageApprovers(client, {
+                quotationId: quote.id,
+                stage: nextStage,
+                title: `Approval Required: Quotation ${quote.quote_code}`,
+                message: `Quotation ${quote.quote_code} (${quote.customerName || "Customer"}) requires ${nextStage} review (${calculation.blendedRisk} Risk).`,
+                type: "APPROVAL_REQUIRED",
+                link: `/approvals/${quote.quote_code}`
+            });
         } else {
             await addAudit(client, { quotationId: quote.id, userId, user, action: "QUOTATION_APPROVED", note: note || "No approval chain required", previousStatus: quote.status, newStatus: nextStatus });
         }
@@ -368,8 +386,23 @@ const performAction = async (codeOrId, userId, action, comment) => {
         const stepResult = await client.query(`SELECT s.* FROM quotation_approval_steps s JOIN quotation_approval_requests ar ON ar.id = s.approval_request_id WHERE ar.quotation_id = $1 AND ar.status = 'PENDING' AND s.status = 'PENDING' ORDER BY s.step_order LIMIT 1 FOR UPDATE OF s, ar`, [quote.id]);
         const step = stepResult.rows[0];
         if (!step) throw createApprovalError("No pending approval step", 400);
+
+        if (normalizeApproverRole(quote.approval_stage) !== normalizeApproverRole(step.approver_role)) {
+            throw createApprovalError(`Quotation approval stage (${quote.approval_stage}) does not match current step (${step.approver_role})`, 400);
+        }
+
         const userRole = normalizeRole(user.role);
         if (!allowedRoles(step.approver_role).has(userRole)) throw createApprovalError("User role is not authorized for this approval step", 403);
+
+        const priorIncomplete = await client.query(
+            `SELECT id FROM quotation_approval_steps
+             WHERE approval_request_id = $1 AND step_order < $2 AND status NOT IN ('APPROVED', 'SKIPPED')`,
+            [step.approval_request_id, step.step_order]
+        );
+        if (priorIncomplete.rows.length > 0) {
+            throw createApprovalError("Prior approval steps must be completed first", 400);
+        }
+
         const stepStatus = action === "APPROVE" ? "APPROVED" : action === "REJECT" ? "REJECTED" : "RETURNED";
         await client.query(`UPDATE quotation_approval_steps SET status = $1, approver_id = $2, acted_at = CURRENT_TIMESTAMP, comment = $3 WHERE id = $4 AND status = 'PENDING'`, [stepStatus, userId, comment || null, step.id]);
         const next = action === "APPROVE" ? await client.query(`SELECT id, approver_role FROM quotation_approval_steps WHERE approval_request_id = $1 AND step_order > $2 AND status = 'WAITING' ORDER BY step_order LIMIT 1`, [step.approval_request_id, step.step_order]) : { rows: [] };
@@ -380,6 +413,76 @@ const performAction = async (codeOrId, userId, action, comment) => {
         await client.query(`UPDATE quotations SET status = $1, approval_stage = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`, [status, stage, quote.id]);
         await addAudit(client, { quotationId: quote.id, userId, user, action: action === "APPROVE" ? "APPROVAL_STEP_APPROVED" : action === "REJECT" ? "APPROVAL_STEP_REJECTED" : "APPROVAL_RETURNED", note: comment, previousStatus: quote.status, newStatus: status });
         if (status === "Approved") await addAudit(client, { quotationId: quote.id, userId, user, action: "QUOTATION_APPROVED", note: comment, previousStatus: quote.status, newStatus: status });
+
+        // Notification routing based on stage progression / conclusion
+        if (action === "APPROVE" && next.rows[0]) {
+            await notifyStageApprovers(client, {
+                quotationId: quote.id,
+                stage: next.rows[0].approver_role,
+                title: `Approval Required: Quotation ${quote.quote_code}`,
+                message: `Quotation ${quote.quote_code} was approved by ${user.name} (${step.approver_role}) and has advanced to ${next.rows[0].approver_role} for review.`,
+                type: "APPROVAL_ADVANCED",
+                link: `/approvals/${quote.quote_code}`
+            });
+            await createNotification(client, {
+                userId: quote.user_id,
+                title: `Quotation ${quote.quote_code}: Advanced to ${next.rows[0].approver_role}`,
+                message: `Your quotation ${quote.quote_code} was approved by ${user.name} and advanced to ${next.rows[0].approver_role} review.`,
+                type: "APPROVAL_ADVANCED",
+                quotationId: quote.id,
+                link: `/quotations/${quote.quote_code}`
+            });
+        } else if (action === "APPROVE" && status === "Approved") {
+            await createNotification(client, {
+                userId: quote.user_id,
+                title: `Quotation ${quote.quote_code}: Final Approval Granted`,
+                message: `Quotation ${quote.quote_code} has received final approval from ${user.name} and is now ready for customer confirmation.`,
+                type: "QUOTATION_APPROVED",
+                quotationId: quote.id,
+                link: `/quotations/${quote.quote_code}`
+            });
+            const custUsers = await client.query("SELECT id FROM users WHERE customer_id = $1 AND role = 'customer' AND is_active = TRUE", [quote.customer_id]);
+            for (const custUser of custUsers.rows) {
+                await createNotification(client, {
+                    userId: custUser.id,
+                    title: `Quotation ${quote.quote_code} Approved`,
+                    message: `Good news! Your quotation ${quote.quote_code} has been approved and is ready to confirm in the portal.`,
+                    type: "QUOTATION_APPROVED",
+                    quotationId: quote.id,
+                    link: `/customer/quotes/${quote.quote_code}`
+                });
+            }
+        } else if (action === "REJECT") {
+            await createNotification(client, {
+                userId: quote.user_id,
+                title: `Quotation ${quote.quote_code}: Rejected`,
+                message: `Quotation ${quote.quote_code} was rejected by ${user.name}: "${comment}"`,
+                type: "QUOTATION_REJECTED",
+                quotationId: quote.id,
+                link: `/quotations/${quote.quote_code}`
+            });
+            const custUsers = await client.query("SELECT id FROM users WHERE customer_id = $1 AND role = 'customer' AND is_active = TRUE", [quote.customer_id]);
+            for (const custUser of custUsers.rows) {
+                await createNotification(client, {
+                    userId: custUser.id,
+                    title: `Quotation ${quote.quote_code} Update`,
+                    message: `Your quotation ${quote.quote_code} counter-offer was rejected: "${comment}"`,
+                    type: "QUOTATION_REJECTED",
+                    quotationId: quote.id,
+                    link: `/customer/quotes/${quote.quote_code}`
+                });
+            }
+        } else if (action === "RETURN") {
+            await createNotification(client, {
+                userId: quote.user_id,
+                title: `Quotation ${quote.quote_code}: Returned for Revision`,
+                message: `Quotation ${quote.quote_code} was returned for revision by ${user.name}: "${comment}"`,
+                type: "QUOTATION_RETURNED",
+                quotationId: quote.id,
+                link: `/quotations/${quote.quote_code}`
+            });
+        }
+
         await client.query("COMMIT");
         return getApprovalDetail(quote.quote_code);
     } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }

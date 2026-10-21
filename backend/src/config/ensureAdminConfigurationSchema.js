@@ -19,6 +19,14 @@ const ensureAdminConfigurationSchema = async () => {
     ALTER TABLE quotation_audit_trail ADD COLUMN IF NOT EXISTS user_role VARCHAR(50);
     ALTER TABLE quotation_audit_trail ADD COLUMN IF NOT EXISTS previous_status VARCHAR(50);
     ALTER TABLE quotation_audit_trail ADD COLUMN IF NOT EXISTS new_status VARCHAR(50);
+
+    ALTER TABLE quotation_negotiation_lines ADD COLUMN IF NOT EXISTS sender_id INTEGER REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL;
+    ALTER TABLE quotation_negotiation_lines ADD COLUMN IF NOT EXISTS sender_role VARCHAR(50) DEFAULT 'customer';
+    ALTER TABLE quotation_negotiation_lines ADD COLUMN IF NOT EXISTS sender_name VARCHAR(255);
+    ALTER TABLE quotation_negotiation_lines ADD COLUMN IF NOT EXISTS message TEXT;
+    UPDATE quotation_negotiation_lines SET message = customer_comment WHERE message IS NULL AND customer_comment IS NOT NULL;
+    UPDATE quotation_negotiation_lines SET sender_role = 'customer' WHERE sender_role IS NULL;
+
     ALTER TABLE products ADD COLUMN IF NOT EXISTS cgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
     ALTER TABLE products ADD COLUMN IF NOT EXISTS sgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
     ALTER TABLE quotation_items ADD COLUMN IF NOT EXISTS cgst_percent NUMERIC(5, 2) NOT NULL DEFAULT 0;
@@ -276,6 +284,51 @@ const ensureAdminConfigurationSchema = async () => {
         CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
         CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_reset_token_hash ON password_reset_tokens(reset_token_hash);
         CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_active ON password_reset_tokens(user_id, is_used, is_otp_verified);
+
+        -- Notifications Table
+        CREATE TABLE IF NOT EXISTS notifications (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+            title VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            type VARCHAR(50) NOT NULL,
+            quotation_id INTEGER REFERENCES quotations(id) ON UPDATE CASCADE ON DELETE CASCADE,
+            link VARCHAR(255) NOT NULL,
+            is_read BOOLEAN NOT NULL DEFAULT FALSE,
+            read_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read);
+        CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_notifications_quotation_id ON notifications(quotation_id);
+
+        -- Ensure standard approval chains exist and are active
+        INSERT INTO approval_chains (name, min_discount_percent, max_discount_percent, min_risk, is_active)
+        VALUES
+            ('Standard Manager Approval', 0.00, NULL, 'MEDIUM', TRUE),
+            ('High Risk Manager Finance Approval', 0.00, NULL, 'HIGH', TRUE)
+        ON CONFLICT (name) DO UPDATE
+        SET min_discount_percent = EXCLUDED.min_discount_percent,
+            max_discount_percent = EXCLUDED.max_discount_percent,
+            min_risk = EXCLUDED.min_risk,
+            is_active = TRUE;
+
+        -- Ensure steps for Standard Manager Approval (Step 1: Sales Manager)
+        INSERT INTO approval_chain_steps (approval_chain_id, step_order, approver_role)
+        SELECT id, 1, 'Sales Manager'
+        FROM approval_chains WHERE name = 'Standard Manager Approval'
+        ON CONFLICT (approval_chain_id, step_order) DO UPDATE SET approver_role = 'Sales Manager';
+
+        -- Ensure steps for High Risk Manager Finance Approval (Step 1: Sales Manager, Step 2: Finance)
+        INSERT INTO approval_chain_steps (approval_chain_id, step_order, approver_role)
+        SELECT id, 1, 'Sales Manager'
+        FROM approval_chains WHERE name = 'High Risk Manager Finance Approval'
+        ON CONFLICT (approval_chain_id, step_order) DO UPDATE SET approver_role = 'Sales Manager';
+
+        INSERT INTO approval_chain_steps (approval_chain_id, step_order, approver_role)
+        SELECT id, 2, 'Finance'
+        FROM approval_chains WHERE name = 'High Risk Manager Finance Approval'
+        ON CONFLICT (approval_chain_id, step_order) DO UPDATE SET approver_role = 'Finance';
     `);
 };
 

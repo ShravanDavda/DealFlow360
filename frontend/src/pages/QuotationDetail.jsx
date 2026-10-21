@@ -5,6 +5,7 @@ import { DashboardNavbar } from '../components/dashboard/DashboardNavbar';
 import { QuotationInfo } from '../components/quotation-detail/QuotationInfo';
 import { QuotationProductTable } from '../components/quotation-detail/QuotationProductTable';
 import { UpsellSuggestions } from '../components/quotation-detail/UpsellSuggestions';
+import { NegotiationConversationPanel } from '../components/negotiation/NegotiationConversationPanel';
 import { Button } from '../components/ui/Button';
 import { 
   getQuotation, 
@@ -26,6 +27,7 @@ export const QuotationDetail = () => {
   const [catalog, setCatalog] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [selectedSuggestions, setSelectedSuggestions] = useState([]);
+  const [negotiationLines, setNegotiationLines] = useState([]);
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -45,6 +47,7 @@ export const QuotationDetail = () => {
       if (quoteData) {
         setQuote(quoteData);
         setProducts(quoteData.products || []);
+        setNegotiationLines(quoteData.negotiationLines || []);
         setTotals({
           subtotal: quoteData.subtotal,
           totalDiscount: quoteData.totalDiscount,
@@ -291,6 +294,15 @@ export const QuotationDetail = () => {
             selectedIds={selectedSuggestions}
             onToggleSuggestion={handleToggleSuggestion}
             readOnly={!isQuotationCreator}
+          />
+        </section>
+
+        <section aria-label="Customer Negotiation Conversation">
+          <NegotiationConversationPanel
+            quotation={quote}
+            currentUser={currentUser}
+            messages={negotiationLines}
+            onMessageSent={loadData}
           />
         </section>
 

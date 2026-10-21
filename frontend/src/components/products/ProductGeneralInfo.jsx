@@ -1,5 +1,6 @@
 import React from 'react';
 import { Package } from 'lucide-react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 export const ProductGeneralInfo = ({ product }) => {
   if (!product) return null;
@@ -38,7 +39,7 @@ export const ProductGeneralInfo = ({ product }) => {
               Price
             </span>
             <span className="mt-1 block font-semibold text-slate-900 text-base">
-              {product.priceFormatted || `$${product.price}`}
+              {formatCurrency(product.priceFormatted || product.price)}
             </span>
           </div>
 

@@ -259,6 +259,32 @@ const updatePriceListItem = async (
         );
     }
 
+    if (priceListId !== undefined && priceListId !== null && priceListId !== '') {
+        if (Number(existingItem.price_list_id) !== Number(priceListId)) {
+            const err = new Error("Price list item does not belong to the specified price list");
+            err.statusCode = 400;
+            throw err;
+        }
+    }
+
+    if (unitPrice !== undefined && unitPrice !== null) {
+        const priceNum = Number(unitPrice);
+        if (isNaN(priceNum) || priceNum < 0) {
+            const err = new Error("Unit price must be a valid non-negative number");
+            err.statusCode = 400;
+            throw err;
+        }
+    }
+
+    if (minQuantity !== undefined && minQuantity !== null) {
+        const minQty = Number(minQuantity);
+        if (isNaN(minQty) || minQty < 1) {
+            const err = new Error("Minimum quantity must be greater than or equal to 1");
+            err.statusCode = 400;
+            throw err;
+        }
+    }
+
     const finalPriceListId =
         priceListId ??
         existingItem.price_list_id;
@@ -451,11 +477,36 @@ const deactivatePriceListItem = async (
     return result.rows[0];
 };
 
+const deletePriceListItem = async (id, priceListId = null) => {
+    const existingItem = await getPriceListItemById(id);
+    if (!existingItem) {
+        const error = new Error("Price list item not found");
+        error.statusCode = 404;
+        throw error;
+    }
+
+    if (priceListId !== null && priceListId !== undefined && priceListId !== '') {
+        if (Number(existingItem.price_list_id) !== Number(priceListId)) {
+            const error = new Error("Price list item does not belong to the specified price list");
+            error.statusCode = 400;
+            throw error;
+        }
+    }
+
+    const result = await pool.query(
+        `DELETE FROM price_list_items WHERE id = $1 RETURNING id, price_list_id, product_id, product_variant_id, unit_price`,
+        [id]
+    );
+
+    return result.rows[0];
+};
+
 export {
     getAllPriceListItems,
     getPriceListItems,
     getPriceListItemById,
     createPriceListItem,
     updatePriceListItem,
-    deactivatePriceListItem
+    deactivatePriceListItem,
+    deletePriceListItem
 };

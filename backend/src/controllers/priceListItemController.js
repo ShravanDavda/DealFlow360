@@ -4,7 +4,8 @@ import {
     getPriceListItemById,
     createPriceListItem,
     updatePriceListItem,
-    deactivatePriceListItem
+    deactivatePriceListItem,
+    deletePriceListItem
 } from "../services/priceListItemService.js";
 
 const getItems = async (req, res) => {
@@ -97,13 +98,15 @@ const createNewItem = async (
 ) => {
     try {
         const {
-            priceListId,
+            priceListId: bodyPriceListId,
             productId,
             productVariantId,
             unitPrice,
             minQuantity,
             maxQuantity
-        } = req.body;
+        } = req.body || {};
+
+        const priceListId = req.params?.priceListId || bodyPriceListId;
 
         if (
             !priceListId ||
@@ -151,10 +154,14 @@ const updateExistingItem = async (
     res
 ) => {
     try {
+        const payload = { ...(req.body || {}) };
+        if (req.params?.priceListId) {
+            payload.priceListId = req.params.priceListId;
+        }
         const item =
             await updatePriceListItem(
                 req.params.id,
-                req.body
+                payload
             );
 
         res.status(200).json({
@@ -203,11 +210,31 @@ const deactivateExistingItem =
         }
     };
 
+const deleteExistingItem = async (req, res) => {
+    try {
+        const priceListId = req.query?.priceListId || req.body?.priceListId || req.params?.priceListId;
+        const item = await deletePriceListItem(req.params.id, priceListId);
+
+        res.status(200).json({
+            success: true,
+            message: "Price list item removed successfully",
+            data: item
+        });
+    } catch (error) {
+        console.error("Delete price list item error:", error);
+        res.status(error.statusCode || 400).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
 export {
     getItems,
     getItemsForPriceList,
     getItem,
     createNewItem,
     updateExistingItem,
-    deactivateExistingItem
+    deactivateExistingItem,
+    deleteExistingItem
 };

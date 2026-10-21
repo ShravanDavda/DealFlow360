@@ -5,6 +5,7 @@ import { DashboardNavbar } from '../components/dashboard/DashboardNavbar';
 import { Button } from '../components/ui/Button';
 import { createProduct, deactivateProduct, getNextProductSku, getProducts } from '../services/productService';
 import { getCategories } from '../services/categoryService';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const EMPTY_FORM = { name: '', sku: '', categoryId: '', baseCost: '', unit: 'Each', cgstPercent: '', sgstPercent: '', description: '' };
 
@@ -154,7 +155,7 @@ export const AdminProducts = () => {
                   <tr key={product.id} className="hover:bg-slate-50">
                     <td className="px-4 py-4"><p className="font-semibold text-slate-900">{product.name}</p><p className="text-xs text-slate-500">{product.sku}</p></td>
                     <td className="px-4 py-4 text-slate-700">{product.category}</td>
-                    <td className="px-4 py-4 font-medium text-slate-900">{Number(product.price).toLocaleString()}</td>
+                    <td className="px-4 py-4 font-medium text-slate-900">{formatCurrency(product.price)}</td>
                     <td className="px-4 py-4 text-slate-700">{product.unit || 'Each'}</td>
                     <td className="px-4 py-4 text-slate-700">CGST {product.cgstPercent}% / SGST {product.sgstPercent}%</td>
                     <td className="max-w-xs px-4 py-4 text-slate-600">{product.description || '-'}</td>

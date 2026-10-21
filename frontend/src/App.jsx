@@ -49,7 +49,11 @@ const RoleGuard = ({ allowedRoles, children }) => {
   if (!state.role) return <Navigate to="/login" replace />;
   if (!allowedRoles.includes(state.role)) {
     if (state.role === 'customer') return <Navigate to="/customer/quotes" replace />;
-    return <Navigate to={state.role === 'admin' ? '/admin-dashboard' : state.role === 'sales_rep' ? '/sales-rep-dashboard' : state.role === 'sales_manager' ? '/sales-manager-dashboard' : '/dashboard'} replace />;
+    if (state.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
+    if (state.role === 'sales_rep') return <Navigate to="/sales-rep-dashboard" replace />;
+    if (state.role === 'sales_manager') return <Navigate to="/sales-manager-dashboard" replace />;
+    if (['finance', 'operations'].includes(state.role)) return <Navigate to="/finance-dashboard" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
   return children;
 };
@@ -102,8 +106,8 @@ export function App() {
         <Route path="/quotations/:quotationId" element={<QuotationDetail />} />
         <Route path="/approvals" element={<Approvals />} />
         <Route path="/approvals/:approvalId" element={<ApprovalDetail />} />
-        <Route path="/fulfillment" element={<RoleGuard allowedRoles={['admin', 'finance', 'operations']}><Fulfillment /></RoleGuard>} />
-        <Route path="/fulfillment/:orderId" element={<RoleGuard allowedRoles={['admin', 'finance', 'operations']}><FulfillmentDetail /></RoleGuard>} />
+        <Route path="/fulfillment" element={<RoleGuard allowedRoles={['admin', 'operations']}><Fulfillment /></RoleGuard>} />
+        <Route path="/fulfillment/:orderId" element={<RoleGuard allowedRoles={['admin', 'operations']}><FulfillmentDetail /></RoleGuard>} />
         <Route path="/subscriptions" element={<RoleGuard allowedRoles={['admin', 'finance', 'operations']}><Subscriptions /></RoleGuard>} />
         <Route path="/subscriptions/:subscriptionId" element={<RoleGuard allowedRoles={['admin', 'finance', 'operations']}><BillingDetail /></RoleGuard>} />
         <Route path="/customer" element={<Navigate to="/customer/quotes" replace />} />

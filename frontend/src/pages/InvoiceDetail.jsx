@@ -13,6 +13,7 @@ import { InvoiceTimeline } from '../components/invoices/InvoiceTimeline';
 import { RelatedInvoicesTable } from '../components/invoices/RelatedInvoicesTable';
 import { Button } from '../components/ui/Button';
 import { getInvoice, recordPayment } from '../services/billingService';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 export const InvoiceDetail = () => {
   const { invoiceId } = useParams();
@@ -47,7 +48,7 @@ export const InvoiceDetail = () => {
         paymentMethod: 'Credit Card (Stripe demo)'
       });
       if (updated) setDetail(updated);
-      setFeedbackMessage(`Payment of $${Number(detail?.amount || 0).toLocaleString()} recorded! Invoice status updated to Paid.`);
+      setFeedbackMessage(`Payment of ${formatCurrency(detail?.amount)} recorded! Invoice status updated to Paid.`);
       setTimeout(() => setFeedbackMessage(''), 5000);
     } catch (err) {
       setErrorMessage(err.message || 'Failed to record payment.');
@@ -58,7 +59,7 @@ export const InvoiceDetail = () => {
   };
 
   const handleDownloadSummary = () => {
-    const summaryText = `DEALFLOW360 INVOICE RECEIPT\n--------------------------------\nInvoice: ${detail?.invoiceId}\nCustomer: ${detail?.customerName}\nAmount: $${Number(detail?.amount || 0).toLocaleString()} ${detail?.currency || 'USD'}\nStatus: ${detail?.status}\nDue Date: ${detail?.dueDate}\nGenerated on: ${new Date().toLocaleDateString()}\n`;
+    const summaryText = `DEALFLOW360 INVOICE RECEIPT\n--------------------------------\nInvoice: ${detail?.invoiceId}\nCustomer: ${detail?.customerName}\nAmount: ${formatCurrency(detail?.amount)}\nStatus: ${detail?.status}\nDue Date: ${detail?.dueDate}\nGenerated on: ${new Date().toLocaleDateString()}\n`;
     const blob = new Blob([summaryText], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -144,7 +145,7 @@ export const InvoiceDetail = () => {
               Status: {detail.status}
             </span>
             <span className="text-sm font-bold text-slate-900 bg-white px-3 py-1 rounded-md border border-slate-200 shadow-sm">
-              ${Number(detail.amount || 0).toLocaleString()} {detail.currency || 'USD'}
+              {formatCurrency(detail.amount)}
             </span>
           </div>
         </div>

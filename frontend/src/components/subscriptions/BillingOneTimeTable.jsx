@@ -1,13 +1,9 @@
 import React from 'react';
 import { ShoppingBag } from 'lucide-react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 export const BillingOneTimeTable = ({ lines = [] }) => {
-  const formatAmount = (amount) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const formatAmount = (amount) => formatCurrency(amount);
 
   return (
     <div className="space-y-3">
