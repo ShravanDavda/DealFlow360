@@ -54,11 +54,16 @@ async function runFulfillmentLifecycleSuite() {
         assert(managerLogin.status === 200, "Manager login successful");
         const managerHeader = { Authorization: `Bearer ${managerLogin.data.data.token}` };
 
-        const custLogin = await request("POST", "/auth/login", { email: "john@acme.com", password: "password123" });
-        assert(custLogin.status === 200, "Customer (john@acme.com) login successful");
+        const custRow = await pool.query("SELECT c.id, c.email, c.company_name FROM customers c JOIN users u ON u.email = c.email WHERE u.role = 'customer' AND u.is_active = TRUE LIMIT 1");
+        const testCustomer = custRow.rows[0];
+        const plRow = await pool.query("SELECT id FROM price_lists WHERE id IN (SELECT price_list_id FROM price_list_items WHERE product_id = (SELECT id FROM products WHERE sku = 'PROD-002') AND is_active = TRUE) AND is_active = TRUE LIMIT 1");
+        const testPriceListId = plRow.rows[0].id;
+
+        const custLogin = await request("POST", "/auth/login", { email: testCustomer.email, password: "password123" });
+        assert(custLogin.status === 200, `Customer (${testCustomer.email}) login successful`);
         const custHeader = { Authorization: `Bearer ${custLogin.data.data.token}` };
         const customerId = custLogin.data.data.user.customerId;
-        assert(customerId === 1, "Customer ID is 1 (Acme Corp)");
+        assert(customerId, `Customer ID is ${customerId} (${testCustomer.company_name})`);
 
         const prodRes = await pool.query("SELECT id, name, sku FROM products WHERE sku = 'PROD-002'");
         const testProduct = prodRes.rows[0];
@@ -88,7 +93,7 @@ async function runFulfillmentLifecycleSuite() {
         const createApprovedQuote = async (quantity, discount = 5) => {
             const createRes = await request("POST", "/quotations", {
                 customerId,
-                priceListId: 1,
+                priceListId: testPriceListId,
                 items: [{ productId: prodId, quantity, discountPercent: discount }]
             }, salesHeader);
             assert(createRes.status === 201, "Quotation created by Sales Rep");

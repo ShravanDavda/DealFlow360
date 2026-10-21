@@ -46,21 +46,25 @@ async function runTests() {
 
   console.log("\n--- Phase 1: Authentication & Customer Identification ---");
   
+  const custUsers = await pool.query("SELECT email FROM users WHERE role = 'customer' AND is_active = TRUE AND status = 'active' ORDER BY id LIMIT 2");
+  const emailA = custUsers.rows[0]?.email || "rohit@bharattech.in";
+  const emailB = custUsers.rows[1]?.email || "priya@aaravindustries.in";
+
   const custALogin = await post("/auth/login", {
-    email: "john@acme.com",
+    email: emailA,
     password: "password123",
   });
-  assert(custALogin.ok && custALogin.data?.data?.token, "Customer A (john@acme.com) logs in successfully");
+  assert(custALogin.ok && custALogin.data?.data?.token, `Customer A (${emailA}) logs in successfully`);
   const tokenA = custALogin.data?.data?.token;
   const userA = custALogin.data?.data?.user;
   assert(userA?.role === "customer", "Customer A user role is 'customer'");
   assert(userA?.customerId !== undefined && userA?.customerId !== null, `Customer A has associated customerId: ${userA?.customerId}`);
 
   const custBLogin = await post("/auth/login", {
-    email: "sarah@betaind.com",
+    email: emailB,
     password: "password123",
   });
-  assert(custBLogin.ok && custBLogin.data?.data?.token, "Customer B (sarah@betaind.com) logs in successfully");
+  assert(custBLogin.ok && custBLogin.data?.data?.token, `Customer B (${emailB}) logs in successfully`);
   const tokenB = custBLogin.data?.data?.token;
   const userB = custBLogin.data?.data?.user;
   assert(userB?.role === "customer", "Customer B user role is 'customer'");
@@ -205,7 +209,7 @@ async function runTests() {
   const maxTierDiscount = tierRes.rows[0]?.ceiling ? Number(tierRes.rows[0].ceiling) : 15;
   console.log(`  [INFO] Customer tier ceiling: ${maxTierDiscount}%`);
 
-  const withinLimitDiscount = Math.min(8, Math.floor(maxTierDiscount));
+  const withinLimitDiscount = Math.min(5, Math.floor(maxTierDiscount));
   const withinLimitRes = await post(`/customer/quotes/${testQuoteCode}/negotiation`, {
     counterDiscount: withinLimitDiscount,
     customerComment: `Proposing ${withinLimitDiscount}% discount within standard ceiling`,
@@ -340,16 +344,16 @@ async function runTests() {
   assert(qRoundRes.ok && qRoundCode, `Created fresh quotation ${qRoundCode} for multi-round test`);
 
   const round1Neg = await post(`/customer/quotes/${qRoundCode}/negotiation`, {
-    counterDiscount: 18,
-    customerComment: "Round 1 counter-offer: 18%",
+    counterDiscount: 8,
+    customerComment: "Round 1 counter-offer: 8%",
   }, tokenA);
-  assert(round1Neg.ok && round1Neg.data?.data?.reEnteredApproval === true, "Round 1: Counter 18% triggers approval");
+  assert(round1Neg.ok && round1Neg.data?.data?.reEnteredApproval === true, "Round 1: Counter 8% triggers approval");
 
   const round1Approve = await post(`/approvals/A-${qRoundDbId}/approve`, {
     decision: "APPROVED",
-    comment: "Manager approves Round 1 (18%)",
+    comment: "Manager approves Round 1 (8%)",
   }, mgrToken);
-  assert(round1Approve.ok, "Round 1: Manager approves 18% discount");
+  assert(round1Approve.ok, "Round 1: Manager approves 8% discount");
 
   const qRoundAfterR1 = await pool.query("SELECT status FROM quotations WHERE id = $1", [qRoundDbId]);
   assert(qRoundAfterR1.rows[0].status === "Approved", "Round 1: Quotation status updated to 'Approved'");

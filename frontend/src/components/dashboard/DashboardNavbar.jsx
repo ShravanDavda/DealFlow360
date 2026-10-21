@@ -3,6 +3,7 @@ import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { ShieldCheck, Menu, X, LogOut, UserCircle, ChevronDown } from 'lucide-react';
 import { getCurrentUser } from '../../services/authService';
 import { getPendingRegistrationCount } from '../../services/userRegistrationService';
+import { NotificationDropdown } from '../ui/NotificationDropdown';
 
 const NAV_ITEMS = [
   { name: 'Dashboard', path: '/dashboard' },
@@ -34,7 +35,13 @@ const SALES_MANAGER_NAV_ITEMS = [
   { name: 'Deal Health', path: '/deal-health' },
 ];
 
-const FINANCE_OPERATIONS_NAV_ITEMS = [
+const FINANCE_NAV_ITEMS = [
+  { name: 'Dashboard', path: '/finance-dashboard' },
+  { name: 'Approval Queue', path: '/approvals' },
+  { name: 'Billing', path: '/invoices' },
+];
+
+const OPERATIONS_NAV_ITEMS = [
   { name: 'Dashboard', path: '/finance-dashboard' },
   { name: 'Approval Queue', path: '/approvals' },
   { name: 'Fulfillment', path: '/fulfillment' },
@@ -59,7 +66,18 @@ export const DashboardNavbar = () => {
   const [user, setUser] = useState(null);
   const [pendingRegistrationCount, setPendingRegistrationCount] = useState(0);
   const navigate = useNavigate();
-  const navItems = user?.role === 'admin' ? ADMIN_NAV_ITEMS : user?.role === 'sales_rep' ? SALES_REP_NAV_ITEMS : user?.role === 'sales_manager' ? SALES_MANAGER_NAV_ITEMS : ['finance', 'operations'].includes(user?.role) ? FINANCE_OPERATIONS_NAV_ITEMS : NAV_ITEMS;
+  const navItems =
+    user?.role === 'admin'
+      ? ADMIN_NAV_ITEMS
+      : user?.role === 'sales_rep'
+      ? SALES_REP_NAV_ITEMS
+      : user?.role === 'sales_manager'
+      ? SALES_MANAGER_NAV_ITEMS
+      : user?.role === 'finance'
+      ? FINANCE_NAV_ITEMS
+      : user?.role === 'operations'
+      ? OPERATIONS_NAV_ITEMS
+      : NAV_ITEMS;
   const isFinanceOperations = ['finance', 'operations'].includes(user?.role);
 
   useEffect(() => {
@@ -169,7 +187,8 @@ export const DashboardNavbar = () => {
             ))}
           </nav>
 
-          <div className="hidden lg:flex items-center gap-1 relative">
+          <div className="hidden lg:flex items-center gap-2 relative">
+            <NotificationDropdown />
             <button
               type="button"
               onClick={() => setIsProfileOpen((prev) => !prev)}
@@ -200,7 +219,8 @@ export const DashboardNavbar = () => {
             )}
           </div>
 
-          <div className="lg:hidden flex items-center">
+          <div className="lg:hidden flex items-center gap-1">
+            <NotificationDropdown />
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen((prev) => !prev)}

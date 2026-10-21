@@ -1,5 +1,6 @@
 import pool from "../config/db.js";
 import { calculateQuotation } from "./quotationCalculationService.js";
+import { createNotification } from "./notificationService.js";
 
 export const calculateBlendedRisk = (items = []) => {
     let totalViolationPoints = 0;
@@ -216,10 +217,19 @@ export const getQuotationByCodeOrId = async (codeOrId) => {
 
     const negRes = await pool.query(
         `
-        SELECT id, product_name AS "productName", customer_comment AS "customerComment", requested_discount AS "requestedDiscount"
+        SELECT id,
+               product_name AS "productName",
+               customer_comment AS "customerComment",
+               requested_discount AS "requestedDiscount",
+               status,
+               created_at AS "createdAt",
+               sender_id AS "senderId",
+               COALESCE(sender_role, 'customer') AS "senderRole",
+               COALESCE(sender_name, CASE WHEN requested_discount IS NOT NULL THEN 'Customer (Counter-Offer)' ELSE 'Customer' END) AS "senderName",
+               COALESCE(message_type, CASE WHEN requested_discount IS NOT NULL THEN 'counter_offer' ELSE 'customer_message' END) AS "messageType"
         FROM quotation_negotiation_lines
         WHERE quotation_id = $1
-        ORDER BY id ASC
+        ORDER BY created_at ASC, id ASC
         `,
         [quote.id]
     );
@@ -593,4 +603,177 @@ export const getUpsellRecommendations = async (idOrCode) => {
         relationshipType: row.type || "CROSS_SELL",
         priority: row.priority || 1
     }));
+};
+
+export const getQuotationMessages = async (quotationCodeOrId, user) => {
+    const quote = await getQuotationByCodeOrId(quotationCodeOrId);
+    if (!quote) {
+        const error = new Error(`Quotation '${quotationCodeOrId}' not found`);
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const customerId = user.customerId || user.id;
+    if (user.role === "customer" && Number(quote.customerId) !== Number(customerId)) {
+        const error = new Error("You are not authorized to access messages for this quotation");
+        error.statusCode = 403;
+        throw error;
+    }
+
+    const repUserId = user.userId || user.id;
+    if (user.role === "sales_rep" && Number(quote.userId) !== Number(repUserId)) {
+        const error = new Error("You are not authorized to access messages for this quotation");
+        error.statusCode = 403;
+        throw error;
+    }
+
+    const { rows } = await pool.query(
+        `SELECT id,
+                quotation_id AS "quotationId",
+                product_name AS "productName",
+                customer_comment AS "message",
+                customer_comment AS "customerComment",
+                requested_discount AS "requestedDiscount",
+                status,
+                created_at AS "createdAt",
+                sender_id AS "senderId",
+                COALESCE(sender_role, 'customer') AS "senderRole",
+                COALESCE(sender_name, CASE WHEN requested_discount IS NOT NULL THEN 'Customer (Counter-Offer)' ELSE 'Customer' END) AS "senderName",
+                COALESCE(message_type, CASE WHEN requested_discount IS NOT NULL THEN 'counter_offer' ELSE 'customer_message' END) AS "messageType"
+         FROM quotation_negotiation_lines
+         WHERE quotation_id = $1
+         ORDER BY created_at ASC, id ASC`,
+        [quote.dbId]
+    );
+
+    return {
+        quoteCode: quote.quoteCode,
+        quotationId: quote.quoteCode,
+        customerName: quote.customerName,
+        status: quote.status,
+        messages: rows
+    };
+};
+
+export const addQuotationReply = async (quotationCodeOrId, user, { message }) => {
+    const quote = await getQuotationByCodeOrId(quotationCodeOrId);
+    if (!quote) {
+        const error = new Error(`Quotation '${quotationCodeOrId}' not found`);
+        error.statusCode = 404;
+        throw error;
+    }
+
+    if (user.role === "customer") {
+        const error = new Error("Customers should send negotiation messages via the customer portal");
+        error.statusCode = 403;
+        throw error;
+    }
+
+    const repUserId = user.userId || user.id;
+    if (user.role === "sales_rep" && Number(quote.userId) !== Number(repUserId)) {
+        const error = new Error("You can only reply to quotations assigned to you");
+        error.statusCode = 403;
+        throw error;
+    }
+
+    const trimmed = (message || "").trim();
+    if (!trimmed) {
+        const error = new Error("Reply message cannot be empty");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (trimmed.length > 2000) {
+        const error = new Error("Reply message cannot exceed 2000 characters");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    // Resolve representative display name from database
+    const userRes = await pool.query(
+        `SELECT COALESCE(NULLIF(CONCAT(first_name, ' ', last_name), ' '), username) AS name
+         FROM users WHERE id = $1`,
+        [repUserId]
+    );
+    const senderName = userRes.rows[0]?.name || user.name || "Sales Representative";
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        const insertRes = await client.query(
+            `INSERT INTO quotation_negotiation_lines (
+                quotation_id,
+                product_name,
+                customer_comment,
+                requested_discount,
+                status,
+                sender_id,
+                sender_role,
+                sender_name,
+                message_type
+             )
+             VALUES ($1, $2, $3, NULL, 'Replied', $4, $5, $6, 'sales_reply')
+             RETURNING id,
+                       quotation_id AS "quotationId",
+                       product_name AS "productName",
+                       customer_comment AS "message",
+                       customer_comment AS "customerComment",
+                       requested_discount AS "requestedDiscount",
+                       status,
+                       created_at AS "createdAt",
+                       sender_id AS "senderId",
+                       sender_role AS "senderRole",
+                       sender_name AS "senderName",
+                       message_type AS "messageType"`,
+            [
+                quote.dbId,
+                "Sales Representative Reply",
+                trimmed,
+                repUserId,
+                user.role || "sales_rep",
+                senderName
+            ]
+        );
+
+        const replyRecord = insertRes.rows[0];
+
+        // Audit logging (preserve quotation status - regular message does NOT change status)
+        const preview = trimmed.length > 100 ? `${trimmed.slice(0, 97)}...` : trimmed;
+        await client.query(
+            `INSERT INTO quotation_audit_trail (quotation_id, user_id, user_name, user_role, action, note, previous_status, new_status)
+             VALUES ($1, $2, $3, $4, 'Sales Representative Reply', $5, $6, $7)`,
+            [
+                quote.dbId,
+                user.userId,
+                senderName,
+                user.role || "sales_rep",
+                `Representative reply sent: ${preview}`,
+                quote.status,
+                quote.status
+            ]
+        );
+
+        // In-app notification for the customer
+        await createNotification({
+            customerId: quote.customerId,
+            quotationId: quote.dbId,
+            title: `Reply on Quotation #${quote.quoteCode}`,
+            message: `${senderName}: "${trimmed.length > 80 ? trimmed.slice(0, 77) + '...' : trimmed}"`,
+            link: `/customer/quotes/${quote.quoteCode}`,
+            client
+        });
+
+        await client.query("COMMIT");
+
+        return {
+            message: "Reply sent successfully",
+            data: replyRecord
+        };
+    } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+    } finally {
+        client.release();
+    }
 };

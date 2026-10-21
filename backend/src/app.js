@@ -23,6 +23,7 @@ import approvalChainRoutes from "./routes/approvalChainRoutes.js";
 import subscriptionPlanRoutes from "./routes/subscriptionPlanRoutes.js";
 import userRegistrationRoutes from "./routes/userRegistrationRoutes.js";
 import productPairingRoutes from "./routes/productPairingRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 dotenv.config();
 
@@ -100,6 +101,7 @@ app.use("/api/fulfillment", fulfillmentRoutes);
 app.use("/api", billingRoutes);
 app.use("/api/customer", customerPortalRoutes);
 app.use("/api/deal-health", dealHealthRoutes);
+app.use("/api/notifications", notificationRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/dashboard", reportRoutes);

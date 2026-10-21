@@ -1,11 +1,8 @@
 import React from 'react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 export const QuotationCard = ({ quotation, onClick }) => {
-  const formattedAmount = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(quotation.amount);
+  const formattedAmount = formatCurrency(quotation.amount);
 
   return (
     <button

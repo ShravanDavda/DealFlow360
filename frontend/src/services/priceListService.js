@@ -10,3 +10,7 @@ export const getPriceListItems = async (id) => (await api.get(`/price-list-items
 export const createPriceListItem = async (payload) => (await api.post('/price-list-items', payload)).data?.data || null;
 export const updatePriceListItem = async (id, payload) => (await api.put(`/price-list-items/${id}`, payload)).data?.data || null;
 export const deactivatePriceListItem = async (id) => (await api.patch(`/price-list-items/${id}/deactivate`)).data?.data || null;
+export const deletePriceListItem = async (id, priceListId) => {
+  const url = priceListId ? `/price-lists/${priceListId}/items/${id}` : `/price-list-items/${id}`;
+  return (await api.delete(url)).data?.data || null;
+};

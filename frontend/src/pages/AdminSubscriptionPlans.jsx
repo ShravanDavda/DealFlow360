@@ -22,6 +22,7 @@ import {
   getSubscriptionPlans,
   updateSubscriptionPlan,
 } from '../services/subscriptionPlanService';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const EMPTY_FORM = {
   id: null,
@@ -225,7 +226,7 @@ export const AdminSubscriptionPlans = () => {
                     <h2 className="mt-6 text-xl font-bold text-slate-900">{plan.name}</h2>
                     <p className="mt-1 text-sm text-slate-500">Service: {planProducts[0]?.name || 'No product associated'}</p>
                     <div className="mt-5 flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-slate-900">{price === null ? '--' : `$${Number(price).toLocaleString()}`}</span>
+                      <span className="text-3xl font-bold text-slate-900">{formatCurrency(price, '--')}</span>
                       <span className="text-sm font-medium text-slate-500">/ {String(plan.billingInterval || 'monthly').toLowerCase()}</span>
                     </div>
                     <p className="mt-6 min-h-[48px] text-sm leading-6 text-slate-600">{plan.description || 'No description provided.'}</p>

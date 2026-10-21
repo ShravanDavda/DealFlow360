@@ -74,13 +74,18 @@ async function runFinalMvpJourney() {
         console.log(`[ADMIN] Warehouse inventory initialized: Warehouse ${mainWhId}, Product "${hardwareProd.name}", Stock = 6 units (other warehouses 0)`);
 
         console.log("\n--- STEP 2: Sales Rep Creates Quotation (Mixed One-Time + Recurring) ---");
+        const custRow = await pool.query("SELECT c.id, c.email, c.company_name FROM customers c JOIN users u ON u.email = c.email WHERE u.role = 'customer' AND u.is_active = TRUE LIMIT 1");
+        const testCustomer = custRow.rows[0];
+        const plRow = await pool.query("SELECT id FROM price_lists WHERE id IN (SELECT price_list_id FROM price_list_items WHERE product_id = $1) AND id IN (SELECT price_list_id FROM price_list_items WHERE product_id = $2) AND is_active = TRUE LIMIT 1", [hardwareProd.id, recurringProd.id]);
+        const testPriceListId = plRow.rows[0].id;
+
         const salesLogin = await request("POST", "/auth/login", { email: "salesrep1@dealflow360.com", password: "password123" });
         assert(salesLogin.status === 200, "Sales Rep login successful");
         const salesHeader = { Authorization: `Bearer ${salesLogin.data.data.token}` };
 
         const quotePayload = {
-            customerId: 1,
-            priceListId: 1,
+            customerId: testCustomer.id,
+            priceListId: testPriceListId,
             items: [
                 { productId: hardwareProd.id, quantity: 10, discountPercent: 5 },
                 { productId: recurringProd.id, quantity: 2, discountPercent: 0 }
@@ -126,8 +131,8 @@ async function runFinalMvpJourney() {
         assert(quoteVerified.data.data.status === "Approved", `Quotation ${quote.id} is in 'Approved' status`);
 
         console.log("\n--- STEP 4: Customer Portal Reviews & Confirms Quotation ---");
-        const custLogin = await request("POST", "/auth/login", { email: "john@acme.com", password: "password123" });
-        assert(custLogin.status === 200, "Customer (john@acme.com) login successful");
+        const custLogin = await request("POST", "/auth/login", { email: testCustomer.email, password: "password123" });
+        assert(custLogin.status === 200, `Customer (${testCustomer.email}) login successful`);
         const custHeader = { Authorization: `Bearer ${custLogin.data.data.token}` };
 
         const custViewRes = await request("GET", `/customer/quotes/${quote.id}`, null, custHeader);

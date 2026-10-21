@@ -74,6 +74,12 @@ async function runNegotiationTestSuite() {
         financeToken = finRes.data.data.token;
 
         console.log("\n--- STEP 2: Create & Activate Customer Account ---");
+        const tierRes = await pool.query("SELECT id FROM customer_tiers LIMIT 1");
+        const validTierId = tierRes.rows[0].id;
+        const pliRes = await pool.query("SELECT price_list_id, product_id FROM price_list_items WHERE is_active = TRUE LIMIT 1");
+        const testPriceListId = pliRes.rows[0].price_list_id;
+        const testProductId = pliRes.rows[0].product_id;
+
         const createCustRes = await request(
             "POST",
             "/customers",
@@ -83,7 +89,7 @@ async function runNegotiationTestSuite() {
                 contactName: "John Doe",
                 email: testCustomerEmail,
                 phone: "+1-555-0899",
-                customerTierId: 1,
+                customerTierId: validTierId,
                 currency: "USD"
             },
             { Authorization: `Bearer ${adminToken}` }
@@ -116,12 +122,12 @@ async function runNegotiationTestSuite() {
             "/quotations",
             {
                 customerId,
-                priceListId: 1,
+                priceListId: testPriceListId,
                 paymentTerms: "Net 30",
                 validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
                 items: [
                     {
-                        productId: 3,
+                        productId: testProductId,
                         quantity: 5,
                         discountPercent: 0
                     }

@@ -295,23 +295,30 @@ async function runTests() {
         }
 
         try {
-            const res = await fetch(`${BASE_URL}/quotations/1`, {
+            const existingQuoteRes = await pool.query("SELECT id, quote_code FROM quotations ORDER BY id DESC LIMIT 1");
+            const existingQuoteCode = existingQuoteRes.rows[0]?.quote_code || "Q-5001";
+            const res = await fetch(`${BASE_URL}/quotations/${existingQuoteCode}`, {
                 headers: { Authorization: `Bearer ${adminToken}` }
             });
             const data = await res.json();
 
-            const recsRes = await fetch(`${BASE_URL}/quotations/1/recommendations`, {
+            const recsRes = await fetch(`${BASE_URL}/quotations/${existingQuoteCode}/recommendations`, {
                 headers: { Authorization: `Bearer ${adminToken}` }
             });
             const recsData = await recsRes.json();
 
             const pass = res.status === 200 && data.success && recsRes.status === 200 && Array.isArray(recsData.data);
-            record(14, "Verify existing quotation functionality still works", pass, `Quotation 1: HTTP ${res.status}, Recommendations: HTTP ${recsRes.status}, Suggestions: ${recsData.data?.length}`);
+            record(14, "Verify existing quotation functionality still works", pass, `Quotation ${existingQuoteCode}: HTTP ${res.status}, Recommendations: HTTP ${recsRes.status}, Suggestions: ${recsData.data?.length}`);
         } catch (err) {
             record(14, "Verify existing quotation functionality still works", false, err.message);
         }
 
         try {
+            const custRes = await pool.query("SELECT id FROM customers LIMIT 1");
+            const plRes = await pool.query("SELECT price_list_id FROM price_list_items WHERE product_id = $1 AND is_active = TRUE LIMIT 1", [dockingStationId]);
+            const testCustId = custRes.rows[0]?.id;
+            const testPlId = plRes.rows[0]?.price_list_id;
+
             const res = await fetch(`${BASE_URL}/quotations/preview`, {
                 method: "POST",
                 headers: {
@@ -319,8 +326,8 @@ async function runTests() {
                     Authorization: `Bearer ${adminToken}`
                 },
                 body: JSON.stringify({
-                    customerId: 1,
-                    priceListId: 1,
+                    customerId: testCustId,
+                    priceListId: testPlId,
                     items: [
                         { productId: dockingStationId, quantity: 2, discountPercent: 10 }
                     ]

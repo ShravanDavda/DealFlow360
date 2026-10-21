@@ -19,8 +19,10 @@ const run = async () => {
   assert(dbProduct.rows.every((row) => Number(row.cgst_percent) === 9 && Number(row.sgst_percent) === 9), "CGST and SGST persist separately in PostgreSQL");
   const attemptedSku = await request("PUT", `/products/${products[0].id}`, { sku: "999999", categoryId: 1, name: products[0].name, baseCost: 100, unit: "Each", cgstPercent: 9, sgstPercent: 9 }, adminToken);
   assert(attemptedSku.status === 200 && attemptedSku.data.data.sku === products[0].sku, "Product SKU remains immutable on edit");
-  await pool.query("INSERT INTO price_list_items (price_list_id, product_id, unit_price, min_quantity, is_active) VALUES (1, $1, 100, 1, TRUE)", [products[0].id]);
-  const quote = await request("POST", "/quotations", { customerId: 1, priceListId: 1, items: [{ productId: products[0].id, quantity: 1, discountPercent: 0 }] }, repToken);
+  const testPlId = (await pool.query("SELECT id FROM price_lists WHERE is_active = TRUE LIMIT 1")).rows[0].id;
+  const testCustId = (await pool.query("SELECT id FROM customers LIMIT 1")).rows[0].id;
+  await pool.query("INSERT INTO price_list_items (price_list_id, product_id, unit_price, min_quantity, is_active) VALUES ($1, $2, 100, 1, TRUE)", [testPlId, products[0].id]);
+  const quote = await request("POST", "/quotations", { customerId: testCustId, priceListId: testPlId, items: [{ productId: products[0].id, quantity: 1, discountPercent: 0 }] }, repToken);
   assert(quote.status === 201, "Quotation can use the new product");
   const quoteRow = await pool.query("SELECT tax_amount FROM quotations WHERE id = $1", [quote.data.data.dbId]);
   assert(Number(quoteRow.rows[0].tax_amount) > 0, "Quotation calculates combined CGST plus SGST tax");

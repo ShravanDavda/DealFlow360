@@ -52,8 +52,13 @@ const run = async () => {
         const inactiveCreated = await request("POST", "/admin/approval-chains", { name: inactiveName, minDiscountPercent: 0, maxDiscountPercent: null, minRisk: "MEDIUM", steps: [{ stepOrder: 1, approverRole: "Sales Manager" }] }, token);
         const inactiveId = inactiveCreated.data.data.id;
         await request("PUT", `/admin/approval-chains/${inactiveId}`, { isActive: false }, token);
-        const preview = await request("POST", "/quotations/preview", { customerId: 1, priceListId: 1, items: [{ productId: 1, quantity: 1, discountPercent: 17 }] }, repToken);
-        const quote = await request("POST", "/quotations", { customerId: 1, priceListId: 1, items: [{ productId: 1, quantity: 1, discountPercent: Number(preview.data.data.items[0].discountLimit) + 2 }] }, repToken);
+        const custRow = await pool.query("SELECT id FROM customers LIMIT 1");
+        const pliRow = await pool.query("SELECT price_list_id, product_id FROM price_list_items WHERE is_active = TRUE LIMIT 1");
+        const testCustId = custRow.rows[0].id;
+        const testPlId = pliRow.rows[0].price_list_id;
+        const testProdId = pliRow.rows[0].product_id;
+        const preview = await request("POST", "/quotations/preview", { customerId: testCustId, priceListId: testPlId, items: [{ productId: testProdId, quantity: 1, discountPercent: 17 }] }, repToken);
+        const quote = await request("POST", "/quotations", { customerId: testCustId, priceListId: testPlId, items: [{ productId: testProdId, quantity: 1, discountPercent: Number(preview.data.data.items[0].discountLimit) + 2 }] }, repToken);
         const submission = await request("POST", `/quotations/${quote.data.data.id}/submit`, {}, repToken);
         const requestRow = await pool.query("SELECT approval_chain_id FROM quotation_approval_requests WHERE quotation_id = $1 ORDER BY id DESC LIMIT 1", [quote.data.data.dbId]);
         assert(submission.status === 200 && Number(requestRow.rows[0].approval_chain_id) !== Number(inactiveId), "Inactive matching chain is ignored by the resolver");

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AlertCircle, Plus, Trash2, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 export const QuotationProductTable = ({
   products = [],
@@ -20,13 +21,6 @@ export const QuotationProductTable = ({
 }) => {
   const [showPicker, setShowPicker] = useState(false);
   const [selectedVariants, setSelectedVariants] = useState({});
-
-  const formatCurrency = (amount) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 0,
-    }).format(amount);
 
   return (
     <div className="space-y-4">

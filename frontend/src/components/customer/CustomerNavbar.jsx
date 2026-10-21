@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShieldCheck, Menu, X, MessageSquare, User, FileText, LogOut } from 'lucide-react';
 import { getCurrentUser } from '../../services/authService';
+import { NotificationDropdown } from '../ui/NotificationDropdown';
 
 export const CustomerNavbar = ({ quoteId }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -71,6 +72,8 @@ export const CustomerNavbar = ({ quoteId }) => {
               </div>
             )}
 
+            <NotificationDropdown />
+
             <button
               type="button"
               onClick={handleLogout}
@@ -82,7 +85,8 @@ export const CustomerNavbar = ({ quoteId }) => {
             </button>
           </nav>
 
-          <div className="md:hidden flex items-center">
+          <div className="md:hidden flex items-center gap-1">
+            <NotificationDropdown />
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen((prev) => !prev)}

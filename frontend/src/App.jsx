@@ -102,8 +102,8 @@ export function App() {
         <Route path="/quotations/:quotationId" element={<QuotationDetail />} />
         <Route path="/approvals" element={<Approvals />} />
         <Route path="/approvals/:approvalId" element={<ApprovalDetail />} />
-        <Route path="/fulfillment" element={<RoleGuard allowedRoles={['admin', 'finance', 'operations']}><Fulfillment /></RoleGuard>} />
-        <Route path="/fulfillment/:orderId" element={<RoleGuard allowedRoles={['admin', 'finance', 'operations']}><FulfillmentDetail /></RoleGuard>} />
+        <Route path="/fulfillment" element={<RoleGuard allowedRoles={['admin', 'operations']}><Fulfillment /></RoleGuard>} />
+        <Route path="/fulfillment/:orderId" element={<RoleGuard allowedRoles={['admin', 'operations']}><FulfillmentDetail /></RoleGuard>} />
         <Route path="/subscriptions" element={<RoleGuard allowedRoles={['admin', 'finance', 'operations']}><Subscriptions /></RoleGuard>} />
         <Route path="/subscriptions/:subscriptionId" element={<RoleGuard allowedRoles={['admin', 'finance', 'operations']}><BillingDetail /></RoleGuard>} />
         <Route path="/customer" element={<Navigate to="/customer/quotes" replace />} />

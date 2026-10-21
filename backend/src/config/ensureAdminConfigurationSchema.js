@@ -318,6 +318,29 @@ const ensureAdminConfigurationSchema = async () => {
         CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
         CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_reset_token_hash ON password_reset_tokens(reset_token_hash);
         CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_active ON password_reset_tokens(user_id, is_used, is_otp_verified);
+
+        -- Two-Way Negotiation Messaging and Notifications
+        ALTER TABLE quotation_negotiation_lines ADD COLUMN IF NOT EXISTS sender_id INTEGER;
+        ALTER TABLE quotation_negotiation_lines DROP CONSTRAINT IF EXISTS quotation_negotiation_lines_sender_id_fkey;
+        ALTER TABLE quotation_negotiation_lines ADD COLUMN IF NOT EXISTS sender_role VARCHAR(50);
+        ALTER TABLE quotation_negotiation_lines ADD COLUMN IF NOT EXISTS sender_name VARCHAR(255);
+        ALTER TABLE quotation_negotiation_lines ADD COLUMN IF NOT EXISTS message_type VARCHAR(50) DEFAULT 'message';
+
+        CREATE TABLE IF NOT EXISTS notifications (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+            customer_id INTEGER REFERENCES customers(id) ON UPDATE CASCADE ON DELETE CASCADE,
+            quotation_id INTEGER REFERENCES quotations(id) ON UPDATE CASCADE ON DELETE CASCADE,
+            title VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            link VARCHAR(255),
+            is_read BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+        CREATE INDEX IF NOT EXISTS idx_notifications_customer_id ON notifications(customer_id);
+        CREATE INDEX IF NOT EXISTS idx_notifications_quotation_id ON notifications(quotation_id);
+        CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
     `);
 };
 

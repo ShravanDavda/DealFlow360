@@ -4,6 +4,7 @@ import { calculateQuotation } from "./quotationCalculationService.js";
 import { createApprovalCycle } from "./approvalService.js";
 import { generateBillingForQuotation } from "./billingService.js";
 import { fulfillFulfillmentOrder } from "./fulfillmentService.js";
+import { createNotification } from "./notificationService.js";
 
 export const getCustomerQuotes = async (customerId, userRole = "customer") => {
     if (!customerId && userRole === "customer") {
@@ -97,10 +98,15 @@ export const getCustomerQuote = async (quoteCodeOrId, customerId, userRole = "cu
 
     const negRes = await pool.query(
         `SELECT id, product_name AS "productName", customer_comment AS "customerComment",
-                requested_discount AS "requestedDiscount", status, created_at AS "createdAt"
+                customer_comment AS "message",
+                requested_discount AS "requestedDiscount", status, created_at AS "createdAt",
+                sender_id AS "senderId",
+                COALESCE(sender_role, 'customer') AS "senderRole",
+                COALESCE(sender_name, CASE WHEN requested_discount IS NOT NULL THEN 'Customer (Counter-Offer)' ELSE 'Customer' END) AS "senderName",
+                COALESCE(message_type, CASE WHEN requested_discount IS NOT NULL THEN 'counter_offer' ELSE 'customer_message' END) AS "messageType"
          FROM quotation_negotiation_lines
          WHERE quotation_id = $1
-         ORDER BY id ASC`,
+         ORDER BY created_at ASC, id ASC`,
         [quote.dbId]
     );
 
@@ -110,12 +116,20 @@ export const getCustomerQuote = async (quoteCodeOrId, customerId, userRole = "cu
             id: `LINE-${i + 1}`,
             productName: p.name,
             customerComment: `Line terms: ${p.discount}% discount applied`,
-            status: "Standard"
+            message: `Line terms: ${p.discount}% discount applied`,
+            status: "Standard",
+            senderRole: "system",
+            senderName: "DealFlow360 System",
+            messageType: "system"
         }));
     }
 
     const historyRes = await pool.query(
-        `SELECT id, product_name, customer_comment, requested_discount, status, created_at
+        `SELECT id, product_name, customer_comment, requested_discount, status, created_at,
+                sender_id AS "senderId",
+                COALESCE(sender_role, 'customer') AS "senderRole",
+                COALESCE(sender_name, CASE WHEN requested_discount IS NOT NULL THEN 'Customer (Counter-Offer)' ELSE 'Customer' END) AS "senderName",
+                COALESCE(message_type, CASE WHEN requested_discount IS NOT NULL THEN 'counter_offer' ELSE 'customer_message' END) AS "messageType"
          FROM quotation_negotiation_lines
          WHERE quotation_id = $1
          ORDER BY created_at DESC`,
@@ -146,9 +160,14 @@ export const getCustomerQuote = async (quoteCodeOrId, customerId, userRole = "cu
             id: row.id,
             productName: row.product_name,
             comment: row.customer_comment,
+            message: row.customer_comment,
             requestedDiscount: row.requested_discount ? Number(row.requested_discount) : null,
             status: row.status,
-            createdAt: row.created_at
+            createdAt: row.created_at,
+            senderId: row.senderId,
+            senderRole: row.senderRole,
+            senderName: row.senderName,
+            messageType: row.messageType
         })),
         isConfirmable: quote.status === "Approved",
         isNegotiable: !["Confirmed", "Rejected"].includes(quote.status)
@@ -170,19 +189,28 @@ export const getNegotiationHistory = async (quoteCodeOrId, customerId, userRole 
     }
 
     const lines = await pool.query(
-        `SELECT id, product_name AS "productName", customer_comment AS "customerComment",
-                requested_discount AS "requestedDiscount", status, created_at AS "createdAt"
+        `SELECT id,
+                product_name AS "productName",
+                customer_comment AS "customerComment",
+                customer_comment AS "message",
+                requested_discount AS "requestedDiscount",
+                status,
+                created_at AS "createdAt",
+                sender_id AS "senderId",
+                COALESCE(sender_role, 'customer') AS "senderRole",
+                COALESCE(sender_name, CASE WHEN requested_discount IS NOT NULL THEN 'Customer (Counter-Offer)' ELSE 'Customer' END) AS "senderName",
+                COALESCE(message_type, CASE WHEN requested_discount IS NOT NULL THEN 'counter_offer' ELSE 'customer_message' END) AS "messageType"
          FROM quotation_negotiation_lines
          WHERE quotation_id = $1
-         ORDER BY created_at DESC`,
+         ORDER BY created_at ASC, id ASC`,
         [quote.dbId]
     );
 
     const audit = await pool.query(
         `SELECT id, action, note, user_name AS "userName", user_role AS "userRole", created_at AS "createdAt"
          FROM quotation_audit_trail
-         WHERE quotation_id = $1 AND action IN ('Negotiation Request', 'RE_APPROVAL_STARTED', 'Confirmed', 'APPROVAL_STEP_APPROVED', 'APPROVAL_STEP_REJECTED', 'APPROVAL_RETURNED', 'QUOTATION_APPROVED')
-         ORDER BY created_at DESC`,
+         WHERE quotation_id = $1 AND action IN ('Negotiation Request', 'RE_APPROVAL_STARTED', 'Confirmed', 'APPROVAL_STEP_APPROVED', 'APPROVAL_STEP_REJECTED', 'APPROVAL_RETURNED', 'QUOTATION_APPROVED', 'Sales Representative Reply')
+         ORDER BY created_at ASC, id ASC`,
         [quote.dbId]
     );
 
@@ -197,7 +225,8 @@ export const submitCustomerNegotiation = async (
     quoteCodeOrId,
     customerId,
     userRole = "customer",
-    { counterDiscount, requestedDeliveryDate, message, comment, customerComment, lineComments = [] } = {}
+    { counterDiscount, requestedDeliveryDate, message, comment, customerComment, lineComments = [] } = {},
+    userId = null
 ) => {
     const quote = await getQuotationByCodeOrId(quoteCodeOrId);
     if (!quote) {
@@ -352,6 +381,9 @@ export const submitCustomerNegotiation = async (
             ? `Customer proposed ${discountNum}% discount (Target Delivery: ${requestedDeliveryDate || "Standard"})`
             : `Customer requested terms change: ${requestedDeliveryDate ? `Delivery ${requestedDeliveryDate}` : "Terms review"}`);
 
+        const senderName = quote.customerName || "Customer";
+        const messageType = hasDiscountProposal ? "counter_offer" : "customer_message";
+
         await client.query(
             `
             INSERT INTO quotation_negotiation_lines (
@@ -359,18 +391,41 @@ export const submitCustomerNegotiation = async (
                 product_name,
                 customer_comment,
                 requested_discount,
-                status
+                status,
+                sender_id,
+                sender_role,
+                sender_name,
+                message_type
             )
-            VALUES ($1, $2, $3, $4, $5)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             `,
             [
                 quote.dbId,
                 hasDiscountProposal ? "Order Counter-Offer" : "Customer Question / Change Request",
                 customerNote,
                 hasDiscountProposal ? discountNum : null,
-                hasDiscountProposal ? (reEnteredApproval ? "Under Review" : "Approved") : "Under Review"
+                hasDiscountProposal ? (reEnteredApproval ? "Under Review" : "Approved") : "Under Review",
+                userId || null,
+                "customer",
+                senderName,
+                messageType
             ]
         );
+
+        if (quote.userId) {
+            const preview = customerNote.length > 80 ? `${customerNote.slice(0, 77)}...` : customerNote;
+            await createNotification({
+                userId: quote.userId,
+                quotationId: quote.dbId,
+                customerId: quote.customerId,
+                title: hasDiscountProposal
+                    ? `New Counter-Offer on Quotation #${quote.quoteCode}`
+                    : `New Customer Message on Quotation #${quote.quoteCode}`,
+                message: `${senderName}: "${preview}"`,
+                link: `/quotations/${quote.quoteCode}`,
+                client
+            });
+        }
 
         const auditNote = reEnteredApproval
             ? `Customer counter discount of ${discountNum}% exceeds limit; re-entered approval flow (${nextStage})`

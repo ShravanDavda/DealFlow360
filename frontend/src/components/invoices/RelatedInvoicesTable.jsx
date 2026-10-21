@@ -1,5 +1,6 @@
 import React from 'react';
 import { Receipt } from 'lucide-react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 const STATUS_BADGES = {
   Paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -7,12 +8,6 @@ const STATUS_BADGES = {
 };
 
 export const RelatedInvoicesTable = ({ invoices = [] }) => {
-  const formatCurrency = (amount, currency = 'USD') =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 0,
-    }).format(amount);
 
   return (
     <div className="space-y-3">

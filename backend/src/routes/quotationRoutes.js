@@ -18,5 +18,8 @@ router.post("/:quotationId/approval/approve", approvalController.approve);
 router.post("/:quotationId/approval/reject", approvalController.reject);
 router.post("/:quotationId/approval/return", approvalController.returnForRevision);
 router.get("/:quotationId/recommendations", quotationController.getRecommendations);
+router.get("/:quotationId/messages", quotationController.getQuotationMessages);
+router.post("/:quotationId/messages", quotationController.addQuotationReply);
+router.post("/:quotationId/reply", quotationController.addQuotationReply);
 
 export default router;

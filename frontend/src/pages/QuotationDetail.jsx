@@ -11,8 +11,11 @@ import {
   updateQuotation, 
   submitQuotation, 
   getRecommendations,
-  previewQuotation
+  previewQuotation,
+  getQuotationMessages,
+  addQuotationReply
 } from '../services/quotationService';
+import { QuotationConversationPanel } from '../components/quotation-detail/QuotationConversationPanel';
 import { getCurrentUser } from '../services/authService';
 import { getProducts } from '../services/productService';
 
@@ -26,6 +29,8 @@ export const QuotationDetail = () => {
   const [catalog, setCatalog] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [selectedSuggestions, setSelectedSuggestions] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [isSendingReply, setIsSendingReply] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -36,10 +41,11 @@ export const QuotationDetail = () => {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const [quoteData, recsData, catData] = await Promise.all([
+      const [quoteData, recsData, catData, messagesData] = await Promise.all([
         getQuotation(quotationId),
         getRecommendations(quotationId).catch(() => []),
-        getProducts().catch(() => [])
+        getProducts().catch(() => []),
+        getQuotationMessages(quotationId).catch(() => [])
       ]);
 
       if (quoteData) {
@@ -57,11 +63,24 @@ export const QuotationDetail = () => {
       }
       setSuggestions(recsData || []);
       setCatalog(catData || []);
+      setMessages(messagesData || quoteData?.negotiationLines || []);
     } catch (err) {
       console.error('Error loading quotation:', err);
       setErrorMessage('Failed to load quotation from server.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSendReply = async (messageText) => {
+    setIsSendingReply(true);
+    try {
+      const res = await addQuotationReply(quotationId, messageText);
+      const updatedMessages = await getQuotationMessages(quotationId).catch(() => []);
+      setMessages(updatedMessages || []);
+      return res;
+    } finally {
+      setIsSendingReply(false);
     }
   };
 
@@ -293,6 +312,17 @@ export const QuotationDetail = () => {
             selectedIds={selectedSuggestions}
             onToggleSuggestion={handleToggleSuggestion}
             readOnly={!isQuotationCreator}
+          />
+        </section>
+
+        <section aria-label="Customer Conversation and Negotiation">
+          <QuotationConversationPanel
+            messages={messages}
+            customerName={customerName}
+            quoteCode={quote?.quoteCode || quotationId}
+            onSendReply={handleSendReply}
+            isSending={isSendingReply}
+            readOnly={!currentUser || (!isQuotationCreator && !['sales_rep', 'sales_manager', 'admin'].includes(currentUser?.role))}
           />
         </section>
 

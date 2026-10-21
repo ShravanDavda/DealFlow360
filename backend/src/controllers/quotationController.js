@@ -115,3 +115,31 @@ export const getRecommendations = async (req, res, next) => {
         next(err);
     }
 };
+
+export const getQuotationMessages = async (req, res, next) => {
+    try {
+        const { quotationId } = req.params;
+        const result = await quotationService.getQuotationMessages(quotationId, req.user);
+        res.status(200).json({
+            success: true,
+            count: result.messages.length,
+            data: result.messages
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const addQuotationReply = async (req, res, next) => {
+    try {
+        const { quotationId } = req.params;
+        const result = await quotationService.addQuotationReply(quotationId, req.user, req.body);
+        res.status(201).json({
+            success: true,
+            message: result.message,
+            data: result.data
+        });
+    } catch (err) {
+        next(err);
+    }
+};

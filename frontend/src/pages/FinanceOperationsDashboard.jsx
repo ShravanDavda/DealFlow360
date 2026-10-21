@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, Clock3, CreditCard, Package, RotateCcw, Truck } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock3, CreditCard, FileText, Package, Truck } from 'lucide-react';
 import { DashboardNavbar } from '../components/dashboard/DashboardNavbar';
+import { getCurrentUser } from '../services/authService';
 import { getApprovals } from '../services/approvalService';
 import { getFulfillmentOrders } from '../services/fulfillmentService';
 import { getInvoices, getSubscriptions } from '../services/billingService';
@@ -39,29 +40,44 @@ const Overview = ({ title, rows }) => (
 );
 
 export const FinanceOperationsDashboard = () => {
+  const [user, setUser] = useState(null);
   const [data, setData] = useState(initialData);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
+  const isFinanceOnly = user?.role === 'finance';
+
   useEffect(() => {
     let isMounted = true;
-    Promise.all([
-      getApprovals({ role: 'Finance', status: 'all' }),
-      getFulfillmentOrders(),
-      getInvoices(),
-      getSubscriptions(),
-    ])
-      .then(([approvalData, fulfillment, invoices, subscriptions]) => {
+
+    getCurrentUser()
+      .then((userRes) => {
         if (!isMounted) return;
-        setData({
-          approvals: approvalData?.approvals || [],
-          fulfillment: fulfillment || [],
-          invoices: invoices || [],
-          subscriptions: subscriptions || [],
+        const currentUser = userRes?.data || null;
+        setUser(currentUser);
+
+        const promises = [
+          getApprovals({ role: 'Finance', status: 'all' }),
+          getInvoices(),
+          getSubscriptions(),
+        ];
+
+        if (currentUser?.role !== 'finance') {
+          promises.push(getFulfillmentOrders());
+        }
+
+        return Promise.all(promises).then(([approvalData, invoices, subscriptions, fulfillment]) => {
+          if (!isMounted) return;
+          setData({
+            approvals: approvalData?.approvals || [],
+            invoices: invoices || [],
+            subscriptions: subscriptions || [],
+            fulfillment: fulfillment || [],
+          });
         });
       })
       .catch(() => {
-        if (isMounted) setErrorMessage('Could not load Finance / Operations metrics from the server.');
+        if (isMounted) setErrorMessage('Could not load dashboard metrics from the server.');
       })
       .finally(() => {
         if (isMounted) setIsLoading(false);
@@ -76,38 +92,61 @@ export const FinanceOperationsDashboard = () => {
   const fulfillmentPending = countBy(data.fulfillment, (item) => ['Pending Split', 'Split Pending'].includes(item.status));
   const backorders = countBy(data.fulfillment, (item) => String(item.status || '').toLowerCase().includes('backorder') || Number(item.remainingQuantity || 0) > 0);
   const billingIssues = countBy(data.invoices, (item) => ['Unpaid', 'Overdue'].includes(item.status));
+  const activeSubscriptions = countBy(data.subscriptions, (item) => item.status === 'Active' || item.is_active !== false);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <DashboardNavbar />
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         <header>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Finance / Operations Dashboard</h1>
-          <p className="mt-1 text-sm text-slate-600">Monitor finance approvals, fulfillment readiness, and billing operations.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            {isFinanceOnly ? 'Finance Dashboard' : 'Finance / Operations Dashboard'}
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">
+            {isFinanceOnly
+              ? 'Monitor finance approvals, invoices, and billing operations.'
+              : 'Monitor finance approvals, fulfillment readiness, and billing operations.'}
+          </p>
         </header>
 
-        {errorMessage && <div className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-800"><AlertCircle className="h-5 w-5 shrink-0" />{errorMessage}</div>}
-        {isLoading && <p className="text-sm font-medium text-slate-500">Loading live Finance / Operations metrics...</p>}
+        {errorMessage && (
+          <div className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-800">
+            <AlertCircle className="h-5 w-5 shrink-0" />
+            {errorMessage}
+          </div>
+        )}
+        {isLoading && <p className="text-sm font-medium text-slate-500">Loading live metrics...</p>}
 
-        <section aria-label="Finance key performance indicators" className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard title="Pending Finance Approvals" value={pendingApprovals} icon={Clock3} tone="text-amber-600" />
-          <MetricCard title="Orders Awaiting Fulfillment" value={fulfillmentPending} icon={Truck} tone="text-blue-600" />
-          <MetricCard title="Backorders" value={backorders} icon={Package} tone="text-rose-600" />
-          <MetricCard title="Billing Issues" value={billingIssues} icon={CreditCard} tone="text-orange-600" />
-        </section>
+        {isFinanceOnly ? (
+          <section aria-label="Finance key performance indicators" className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard title="Pending Finance Approvals" value={pendingApprovals} icon={Clock3} tone="text-amber-600" />
+            <MetricCard title="Billing Issues" value={billingIssues} icon={CreditCard} tone="text-orange-600" />
+            <MetricCard title="Total Invoices" value={data.invoices.length} icon={FileText} tone="text-blue-600" />
+            <MetricCard title="Active Subscriptions" value={activeSubscriptions} icon={Package} tone="text-emerald-600" />
+          </section>
+        ) : (
+          <section aria-label="Finance and operations key performance indicators" className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard title="Pending Finance Approvals" value={pendingApprovals} icon={Clock3} tone="text-amber-600" />
+            <MetricCard title="Orders Awaiting Fulfillment" value={fulfillmentPending} icon={Truck} tone="text-blue-600" />
+            <MetricCard title="Backorders" value={backorders} icon={Package} tone="text-rose-600" />
+            <MetricCard title="Billing Issues" value={billingIssues} icon={CreditCard} tone="text-orange-600" />
+          </section>
+        )}
 
-        <section className="grid grid-cols-1 gap-5 lg:grid-cols-3" aria-label="Finance operational overviews">
+        <section className={`grid grid-cols-1 gap-5 ${isFinanceOnly ? 'lg:grid-cols-2' : 'lg:grid-cols-3'}`} aria-label="Operational overviews">
           <Overview title="Approval Overview" rows={[
             ['Pending', countBy(data.approvals, (item) => item.status === 'Pending' && String(item.currentStep || '').toLowerCase() === 'finance')],
             ['Approved', countBy(data.approvals, (item) => item.status === 'Approved')],
             ['Returned', countBy(data.approvals, (item) => item.status === 'Returned')],
           ]} />
-          <Overview title="Fulfillment Overview" rows={[
-            ['Awaiting Fulfillment', countBy(data.fulfillment, (item) => ['Pending Split', 'Split Pending'].includes(item.status))],
-            ['Partially Fulfilled', countBy(data.fulfillment, (item) => ['Partially Fulfilled', 'Partially Shipped'].includes(item.status))],
-            ['Backordered', backorders],
-            ['Fulfilled', countBy(data.fulfillment, (item) => item.status === 'Fulfilled')],
-          ]} />
+          {!isFinanceOnly && (
+            <Overview title="Fulfillment Overview" rows={[
+              ['Awaiting Fulfillment', countBy(data.fulfillment, (item) => ['Pending Split', 'Split Pending'].includes(item.status))],
+              ['Partially Fulfilled', countBy(data.fulfillment, (item) => ['Partially Fulfilled', 'Partially Shipped'].includes(item.status))],
+              ['Backordered', backorders],
+              ['Fulfilled', countBy(data.fulfillment, (item) => item.status === 'Fulfilled')],
+            ]} />
+          )}
           <Overview title="Billing Overview" rows={[
             ['Pending Invoices', countBy(data.invoices, (item) => item.status === 'Unpaid')],
             ['Recurring Billing', data.subscriptions.length],
@@ -116,7 +155,10 @@ export const FinanceOperationsDashboard = () => {
           ]} />
         </section>
 
-        <div className="flex items-center gap-2 text-xs text-slate-500"><CheckCircle2 className="h-4 w-4 text-emerald-600" />Metrics are calculated from the current approval, fulfillment, invoice, and subscription records.</div>
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          Metrics are calculated from current live database records.
+        </div>
       </main>
     </div>
   );

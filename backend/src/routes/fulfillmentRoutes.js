@@ -4,7 +4,7 @@ import authenticateToken from "../middleware/authMiddleware.js";
 import requireRoles from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
-router.use(authenticateToken, requireRoles("admin", "finance", "operations"));
+router.use(authenticateToken, requireRoles("admin", "operations"));
 
 router.get("/orders", fulfillmentController.getFulfillmentOrders);
 router.get("/orders/:orderId", fulfillmentController.getFulfillmentDetail);

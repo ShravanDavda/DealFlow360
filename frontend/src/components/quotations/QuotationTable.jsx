@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 const STATUS_BADGE_CLASSES = {
   'Draft': 'bg-slate-100 text-slate-700 border-slate-200',
@@ -9,12 +10,7 @@ const STATUS_BADGE_CLASSES = {
 };
 
 export const QuotationTable = ({ quotations = [], onQuotationClick, managerView = false, salesRepView = false }) => {
-  const formatAmount = (amount) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const formatAmount = (amount) => formatCurrency(amount);
 
   const actionFor = (quotation) => {
     if (quotation.status === 'Draft') return 'Edit Draft';

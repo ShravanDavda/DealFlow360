@@ -1,4 +1,5 @@
 import api from './api';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 export const getProducts = async () => {
   const response = await api.get('/products');
@@ -35,7 +36,7 @@ export const toProductRow = (product) => ({
   category: product.category || product.category_name || 'Uncategorized',
   variants: product.variants || '-',
   price: Number(product.price ?? product.base_cost ?? 0),
-  priceFormatted: product.priceFormatted || `$${Number(product.price ?? product.base_cost ?? 0).toLocaleString()}`,
+  priceFormatted: formatCurrency(product.price ?? product.base_cost ?? 0),
   unit: product.unit || 'Each',
   tax: product.tax || '0%',
   status: product.status || (product.is_active ? 'Active' : 'Archived'),

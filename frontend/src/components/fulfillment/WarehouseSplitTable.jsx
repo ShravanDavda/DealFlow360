@@ -1,13 +1,9 @@
 import React from 'react';
 import { Layers } from 'lucide-react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 export const WarehouseSplitTable = ({ warehouseSplits = [] }) => {
-  const formatCost = (amount) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const formatCost = (amount) => formatCurrency(amount);
 
   return (
     <div className="space-y-3">

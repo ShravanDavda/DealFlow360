@@ -25,10 +25,22 @@ export const confirmCustomerQuote = async (quoteId) => {
   return response.data || null;
 };
 
+export const submitCustomerMessage = async (quoteId, message) => {
+  const response = await api.post(`/customer/quotes/${quoteId}/messages`, { message });
+  return response.data || null;
+};
+
+export const getCustomerMessages = async (quoteId) => {
+  const response = await api.get(`/customer/quotes/${quoteId}/messages`);
+  return response.data?.data || [];
+};
+
 export default {
   getCustomerQuotes,
   getCustomerQuote,
   getNegotiationHistory,
   submitCustomerNegotiation,
   confirmCustomerQuote,
+  submitCustomerMessage,
+  getCustomerMessages,
 };

@@ -37,17 +37,29 @@ const getPriceListItems = async (priceListId) => {
         SELECT
             pli.id,
             pli.price_list_id,
+            pli.price_list_id AS "priceListId",
             pl.name AS price_list_name,
+            pl.name AS "priceListName",
             pli.product_id,
+            pli.product_id AS "productId",
             p.name AS product_name,
+            p.name AS "productName",
             p.sku AS product_sku,
+            p.sku AS "productSku",
             pli.product_variant_id,
+            pli.product_variant_id AS "productVariantId",
             pv.variant_name,
+            pv.variant_name AS "variantName",
             pv.sku AS variant_sku,
+            pv.sku AS "variantSku",
             pli.unit_price,
+            pli.unit_price AS "unitPrice",
             pli.min_quantity,
+            pli.min_quantity AS "minQuantity",
             pli.max_quantity,
+            pli.max_quantity AS "maxQuantity",
             pli.is_active,
+            pli.is_active AS "isActive",
             pli.created_at,
             pli.updated_at
         FROM price_list_items pli
@@ -58,6 +70,7 @@ const getPriceListItems = async (priceListId) => {
         LEFT JOIN product_variants pv
             ON pli.product_variant_id = pv.id
         WHERE pli.price_list_id = $1
+          AND pli.is_active = TRUE
         ORDER BY pli.id ASC
         `,
         [priceListId]
@@ -108,6 +121,18 @@ const createPriceListItem = async ({
     minQuantity,
     maxQuantity
 }) => {
+    if (unitPrice === undefined || isNaN(Number(unitPrice)) || Number(unitPrice) < 0) {
+        const error = new Error("Unit price must be a non-negative number");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (minQuantity !== undefined && (isNaN(Number(minQuantity)) || Number(minQuantity) < 1)) {
+        const error = new Error("Minimum quantity must be at least 1");
+        error.statusCode = 400;
+        throw error;
+    }
+
     const priceList = await pool.query(
         `
         SELECT id
@@ -254,9 +279,31 @@ const updatePriceListItem = async (
         await getPriceListItemById(id);
 
     if (!existingItem) {
-        throw new Error(
-            "Price list item not found"
-        );
+        const error = new Error("Price list item not found");
+        error.statusCode = 404;
+        throw error;
+    }
+
+    // Security check: If caller provides priceListId, ensure this item actually belongs to that price list
+    if (priceListId !== undefined && priceListId !== null && Number(existingItem.price_list_id) !== Number(priceListId)) {
+        const error = new Error("Item does not belong to the specified price list");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    if (unitPrice !== undefined) {
+        const numericPrice = Number(unitPrice);
+        if (isNaN(numericPrice) || numericPrice < 0) {
+            const error = new Error("Unit price must be a non-negative number");
+            error.statusCode = 400;
+            throw error;
+        }
+    }
+
+    if (minQuantity !== undefined && (isNaN(Number(minQuantity)) || Number(minQuantity) < 1)) {
+        const error = new Error("Minimum quantity must be at least 1");
+        error.statusCode = 400;
+        throw error;
     }
 
     const finalPriceListId =
@@ -451,11 +498,44 @@ const deactivatePriceListItem = async (
     return result.rows[0];
 };
 
+const deletePriceListItem = async (id, priceListId = null) => {
+    const existingItem = await getPriceListItemById(id);
+
+    if (!existingItem) {
+        const error = new Error("Price list item not found");
+        error.statusCode = 404;
+        throw error;
+    }
+
+    if (priceListId !== undefined && priceListId !== null && Number(existingItem.price_list_id) !== Number(priceListId)) {
+        const error = new Error("Item does not belong to the specified price list");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const result = await pool.query(
+        `
+        DELETE FROM price_list_items
+        WHERE id = $1
+        RETURNING
+            id,
+            price_list_id,
+            product_id,
+            product_variant_id,
+            unit_price
+        `,
+        [id]
+    );
+
+    return result.rows[0];
+};
+
 export {
     getAllPriceListItems,
     getPriceListItems,
     getPriceListItemById,
     createPriceListItem,
     updatePriceListItem,
-    deactivatePriceListItem
+    deactivatePriceListItem,
+    deletePriceListItem
 };

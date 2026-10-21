@@ -59,16 +59,57 @@ export const submitNegotiation = async (req, res, next) => {
         const { quoteId } = req.params;
         const customerId = req.user?.customerId;
         const role = req.user?.role;
+        const userId = req.user?.userId || req.user?.id;
         const result = await customerPortalService.submitCustomerNegotiation(
             quoteId,
             customerId,
             role,
-            req.body
+            req.body,
+            userId
         );
         res.status(200).json({
             success: true,
             message: result.message,
             data: result
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const submitCustomerMessage = async (req, res, next) => {
+    try {
+        const { quoteId } = req.params;
+        const customerId = req.user?.customerId;
+        const role = req.user?.role;
+        const userId = req.user?.userId || req.user?.id;
+        const messageText = req.body.message || req.body.customerComment || "";
+        const result = await customerPortalService.submitCustomerNegotiation(
+            quoteId,
+            customerId,
+            role,
+            { customerComment: messageText },
+            userId
+        );
+        res.status(200).json({
+            success: true,
+            message: result.message,
+            data: result
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getNegotiationMessages = async (req, res, next) => {
+    try {
+        const { quoteId } = req.params;
+        const customerId = req.user?.customerId;
+        const role = req.user?.role;
+        const history = await customerPortalService.getNegotiationHistory(quoteId, customerId, role);
+        res.status(200).json({
+            success: true,
+            data: history.negotiationLines || []
         });
     } catch (err) {
         next(err);

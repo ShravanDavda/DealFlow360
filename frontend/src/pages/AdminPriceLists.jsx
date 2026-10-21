@@ -8,11 +8,13 @@ import {
   createPriceListItem,
   deactivatePriceListItem,
   deletePriceList,
+  deletePriceListItem,
   getPriceListItems,
   getPriceLists,
   updatePriceList,
   updatePriceListItem
 } from '../services/priceListService';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const CURRENCIES = [
   { code: 'INR', label: 'INR — Indian Rupee' },
@@ -55,6 +57,14 @@ export const AdminPriceLists = () => {
   const [isDeletingList, setIsDeletingList] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
+  // Item-level management state
+  const [isLoadingItems, setIsLoadingItems] = useState(false);
+  const [isSavingItem, setIsSavingItem] = useState(false);
+  const [itemFormError, setItemFormError] = useState('');
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [isDeletingItem, setIsDeletingItem] = useState(false);
+  const [itemDeleteError, setItemDeleteError] = useState('');
+
   const loadLists = async () => {
     try {
       const data = await getPriceLists();
@@ -66,8 +76,19 @@ export const AdminPriceLists = () => {
   };
 
   const loadItems = async (id) => {
-    if (id) setItems(await getPriceListItems(id));
-    else setItems([]);
+    if (!id) {
+      setItems([]);
+      return;
+    }
+    setIsLoadingItems(true);
+    try {
+      const data = await getPriceListItems(id);
+      setItems(data || []);
+    } catch (error) {
+      setFeedback(error.message || 'Failed to load price list items.');
+    } finally {
+      setIsLoadingItems(false);
+    }
   };
 
   useEffect(() => {
@@ -90,6 +111,7 @@ export const AdminPriceLists = () => {
       const data = await getPriceLists();
       setLists(data);
       if (saved?.id) setSelectedId(saved.id);
+      else if (!selectedId && data[0]?.id) setSelectedId(data[0].id);
     } catch (error) {
       setFormError(error.message || 'Failed to save price list.');
       setFeedback(error.message || 'Failed to save price list.');
@@ -124,25 +146,102 @@ export const AdminPriceLists = () => {
     }
   };
 
+  const handleEditItem = (item) => {
+    setItemForm({
+      id: item.id,
+      productId: item.productId || item.product_id || '',
+      productVariantId: item.productVariantId || item.product_variant_id || '',
+      unitPrice: item.unitPrice !== undefined ? item.unitPrice : (item.unit_price !== undefined ? item.unit_price : ''),
+      minQuantity: item.minQuantity !== undefined ? item.minQuantity : (item.min_quantity !== undefined ? item.min_quantity : 1),
+      maxQuantity: item.maxQuantity !== undefined ? (item.maxQuantity || '') : (item.max_quantity !== undefined ? (item.max_quantity || '') : ''),
+      productName: item.productName || item.product_name || '',
+      productSku: item.productSku || item.product_sku || '',
+      variantName: item.variantName || item.variant_name || '',
+    });
+    setEditingItem(true);
+    setItemFormError('');
+  };
+
+  const handleOpenAddItem = () => {
+    setItemForm({ ...EMPTY_ITEM });
+    setEditingItem(false);
+    setItemFormError('');
+  };
+
+  const handleCancelItemEdit = () => {
+    setItemForm(null);
+    setEditingItem(false);
+    setItemFormError('');
+  };
+
   const saveItem = async (event) => {
     event.preventDefault();
+    if (isSavingItem) return;
+    setItemFormError('');
+
     try {
+      const prodId = Number(itemForm.productId);
+      if (!prodId || isNaN(prodId)) {
+        throw new Error('Please select a valid product.');
+      }
+
+      const priceNum = Number(itemForm.unitPrice);
+      if (itemForm.unitPrice === '' || isNaN(priceNum) || priceNum < 0) {
+        throw new Error('Unit price must be a non-negative number.');
+      }
+
+      const minQty = Number(itemForm.minQuantity || 1);
+      if (isNaN(minQty) || minQty < 1) {
+        throw new Error('Minimum quantity must be at least 1.');
+      }
+
+      const maxQty = itemForm.maxQuantity ? Number(itemForm.maxQuantity) : null;
+      if (maxQty !== null && (isNaN(maxQty) || maxQty < minQty)) {
+        throw new Error('Maximum quantity cannot be less than minimum quantity.');
+      }
+
+      setIsSavingItem(true);
       const payload = {
         priceListId: selectedId,
-        productId: Number(itemForm.productId),
+        productId: prodId,
         productVariantId: itemForm.productVariantId ? Number(itemForm.productVariantId) : null,
-        unitPrice: Number(itemForm.unitPrice),
-        minQuantity: Number(itemForm.minQuantity || 1),
-        maxQuantity: itemForm.maxQuantity ? Number(itemForm.maxQuantity) : null
+        unitPrice: priceNum,
+        minQuantity: minQty,
+        maxQuantity: maxQty
       };
-      if (editingItem) await updatePriceListItem(itemForm.id, payload);
-      else await createPriceListItem(payload);
-      setFeedback('Price entry saved.');
-      setItemForm(EMPTY_ITEM);
+
+      if (editingItem) {
+        await updatePriceListItem(itemForm.id, payload);
+        setFeedback(`Price entry for "${itemForm.productName || 'product'}" updated successfully.`);
+      } else {
+        await createPriceListItem(payload);
+        setFeedback('New price entry created successfully.');
+      }
+
+      setItemForm(null);
       setEditingItem(false);
       await loadItems(selectedId);
     } catch (error) {
-      setFeedback(error.message);
+      setItemFormError(error.message || 'Failed to save price list item.');
+    } finally {
+      setIsSavingItem(false);
+    }
+  };
+
+  const handleDeleteItem = async () => {
+    if (!itemToDelete || isDeletingItem) return;
+    setIsDeletingItem(true);
+    setItemDeleteError('');
+    try {
+      await deletePriceListItem(itemToDelete.id, selectedId);
+      const prodName = itemToDelete.product_name || itemToDelete.productName || 'Product';
+      setFeedback(`Removed "${prodName}" from price list.`);
+      setItemToDelete(null);
+      await loadItems(selectedId);
+    } catch (error) {
+      setItemDeleteError(error.message || 'Failed to remove price list item.');
+    } finally {
+      setIsDeletingItem(false);
     }
   };
 
@@ -211,53 +310,82 @@ export const AdminPriceLists = () => {
             {selectedList && (
               <>
                 <div className="mt-6 flex items-center justify-between">
-                  <h3 className="font-medium text-slate-900">Price list items</h3>
+                  <div>
+                    <h3 className="font-medium text-slate-900">Price list items</h3>
+                    <p className="text-xs text-slate-500">Configure real product prices and quantity tiers for this price list.</p>
+                  </div>
                   <Button
                     type="button"
-                    onClick={() => { setItemForm(EMPTY_ITEM); setEditingItem(false); }}
+                    onClick={handleOpenAddItem}
                     className="!w-auto px-3 gap-1"
                   >
                     <Plus className="h-4 w-4" />
                     Add item
                   </Button>
                 </div>
-                <div className="mt-3 overflow-x-auto">
-                  <table className="min-w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b text-slate-500">
-                        <th className="py-2">Product</th>
-                        <th>Price</th>
-                        <th>Quantity</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((item) => (
-                        <tr key={item.id} className="border-b">
-                          <td className="py-3">{item.product_name}</td>
-                          <td>{item.unit_price}</td>
-                          <td>{item.min_quantity}-{item.max_quantity || 'open'}</td>
-                          <td>
-                            <button
-                              type="button"
-                              onClick={() => { setItemForm(item); setEditingItem(true); }}
-                              className="mr-2 text-slate-600"
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={async () => { await deactivatePriceListItem(item.id); loadItems(selectedId); }}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </td>
+
+                {isLoadingItems ? (
+                  <div className="py-8 text-center text-sm text-slate-500">
+                    Loading price list items...
+                  </div>
+                ) : items.length === 0 ? (
+                  <div className="mt-4 rounded-md border border-dashed border-slate-300 p-8 text-center">
+                    <p className="text-sm font-medium text-slate-600">No items configured in this price list yet.</p>
+                    <p className="mt-1 text-xs text-slate-400">Click &quot;Add item&quot; above to configure a product&apos;s price.</p>
+                  </div>
+                ) : (
+                  <div className="mt-3 overflow-x-auto">
+                    <table className="min-w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b text-slate-500 font-semibold">
+                          <th className="py-2.5">Product</th>
+                          <th className="py-2.5">Price</th>
+                          <th className="py-2.5">Quantity Tier</th>
+                          <th className="py-2.5 text-right">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {items.map((item) => (
+                          <tr key={item.id} className="hover:bg-slate-50/80">
+                            <td className="py-3">
+                              <p className="font-medium text-slate-900">{item.product_name || item.productName}</p>
+                              <p className="text-xs text-slate-500">
+                                {item.product_sku || item.productSku}
+                                {(item.variant_name || item.variantName) ? ` · ${item.variant_name || item.variantName}` : ''}
+                              </p>
+                            </td>
+                            <td className="py-3 font-semibold text-slate-900">
+                              {formatCurrency(item.unit_price !== undefined ? item.unit_price : item.unitPrice)}
+                            </td>
+                            <td className="py-3 text-slate-600">
+                              {(item.min_quantity ?? item.minQuantity ?? 1)} - {(item.max_quantity || item.maxQuantity || 'Open')}
+                            </td>
+                            <td className="py-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditItem(item)}
+                                  title="Edit item price"
+                                  className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                                >
+                                  <Edit3 className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setItemToDelete(item); setItemDeleteError(''); }}
+                                  title="Remove item from price list"
+                                  className="rounded p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </>
             )}
           </section>
@@ -396,54 +524,171 @@ export const AdminPriceLists = () => {
         )}
 
         {itemForm && (
-          <div className="fixed inset-0 z-40 bg-slate-900/40 p-4">
-            <form onSubmit={saveItem} className="mx-auto mt-10 max-w-lg space-y-4 rounded-lg bg-white p-6">
-              <div className="flex justify-between">
-                <h2 className="font-semibold">{editingItem ? 'Edit' : 'Add'} price entry</h2>
-                <button type="button" onClick={() => setItemForm(null)}>
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4">
+            <form onSubmit={saveItem} className="w-full max-w-lg space-y-4 rounded-lg bg-white p-6 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    {editingItem ? 'Edit Price Entry' : 'Add Price Entry'}
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {editingItem ? `Update pricing for ${itemForm.productName} in ${selectedList?.name}` : `Add product pricing to ${selectedList?.name}`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCancelItemEdit}
+                  disabled={isSavingItem}
+                  className="text-slate-400 hover:text-slate-600"
+                >
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <select
-                required
-                value={itemForm.productId}
-                onChange={(e) => setItemForm({ ...itemForm, productId: e.target.value })}
-                className="w-full rounded border p-2"
-              >
-                <option value="">Select product</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>{product.name}</option>
-                ))}
-              </select>
-              <input
-                required
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Unit price"
-                value={itemForm.unitPrice}
-                onChange={(e) => setItemForm({ ...itemForm, unitPrice: e.target.value })}
-                className="w-full rounded border p-2"
-              />
-              <input
-                required
-                type="number"
-                min="1"
-                placeholder="Minimum quantity"
-                value={itemForm.minQuantity}
-                onChange={(e) => setItemForm({ ...itemForm, minQuantity: e.target.value })}
-                className="w-full rounded border p-2"
-              />
-              <input
-                type="number"
-                min="1"
-                placeholder="Maximum quantity"
-                value={itemForm.maxQuantity || ''}
-                onChange={(e) => setItemForm({ ...itemForm, maxQuantity: e.target.value })}
-                className="w-full rounded border p-2"
-              />
-              <Button type="submit">Save price entry</Button>
+
+              {itemFormError && (
+                <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
+                  {itemFormError}
+                </div>
+              )}
+
+              {editingItem ? (
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Product</p>
+                  <p className="font-semibold text-slate-900 mt-0.5">{itemForm.productName}</p>
+                  <p className="text-xs text-slate-500">{itemForm.productSku} {itemForm.variantName ? `· ${itemForm.variantName}` : ''}</p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Product *</label>
+                  <select
+                    required
+                    value={itemForm.productId}
+                    onChange={(e) => setItemForm({ ...itemForm, productId: e.target.value })}
+                    className="w-full rounded border border-slate-300 p-2 text-sm bg-white text-slate-900"
+                    disabled={isSavingItem}
+                  >
+                    <option value="">Select product</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} ({product.sku})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Unit Price ($) *</label>
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={itemForm.unitPrice}
+                  onChange={(e) => setItemForm({ ...itemForm, unitPrice: e.target.value })}
+                  className="w-full rounded border border-slate-300 p-2 text-sm text-slate-900"
+                  disabled={isSavingItem}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Minimum Quantity *</label>
+                  <input
+                    required
+                    type="number"
+                    min="1"
+                    placeholder="1"
+                    value={itemForm.minQuantity}
+                    onChange={(e) => setItemForm({ ...itemForm, minQuantity: e.target.value })}
+                    className="w-full rounded border border-slate-300 p-2 text-sm text-slate-900"
+                    disabled={isSavingItem}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Maximum Quantity (optional)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Open"
+                    value={itemForm.maxQuantity || ''}
+                    onChange={(e) => setItemForm({ ...itemForm, maxQuantity: e.target.value })}
+                    className="w-full rounded border border-slate-300 p-2 text-sm text-slate-900"
+                    disabled={isSavingItem}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCancelItemEdit}
+                  disabled={isSavingItem}
+                  className="!w-auto px-4"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  isLoading={isSavingItem}
+                  disabled={isSavingItem}
+                  className="!w-auto px-5"
+                >
+                  {editingItem ? 'Save Changes' : 'Add Price Entry'}
+                </Button>
+              </div>
             </form>
+          </div>
+        )}
+
+        {itemToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+            <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-slate-900">Remove Item from Price List</h3>
+                <button
+                  type="button"
+                  onClick={() => { setItemToDelete(null); setItemDeleteError(''); }}
+                  disabled={isDeletingItem}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <p className="text-sm text-slate-600">
+                Are you sure you want to remove <strong className="text-slate-900">{itemToDelete.product_name || itemToDelete.productName}</strong> ({itemToDelete.product_sku || itemToDelete.productSku}) from <strong className="text-slate-900">{selectedList?.name}</strong>?
+              </p>
+              <p className="text-xs text-slate-500 bg-slate-50 p-3 rounded border border-slate-200">
+                This will only remove the pricing entry from this price list. The underlying product will remain completely intact in your catalog.
+              </p>
+              {itemDeleteError && (
+                <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
+                  {itemDeleteError}
+                </div>
+              )}
+              <div className="flex justify-end gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => { setItemToDelete(null); setItemDeleteError(''); }}
+                  disabled={isDeletingItem}
+                  className="!w-auto px-4"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleDeleteItem}
+                  isLoading={isDeletingItem}
+                  disabled={isDeletingItem}
+                  className="!w-auto px-4 bg-rose-600 hover:bg-rose-700 text-white"
+                >
+                  Remove Item
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </main>

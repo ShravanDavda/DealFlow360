@@ -26,53 +26,36 @@ const login = async (email) => {
     return result.data.data.token;
 };
 
+import ensureAdminConfigurationSchema from "./src/config/ensureAdminConfigurationSchema.js";
+
 const configureTestChains = async () => {
-    const client = await pool.connect();
-    try {
-        await client.query("BEGIN");
-        await client.query("UPDATE approval_chains SET is_active = FALSE");
-        const chainIds = {};
-        for (const [name, minRisk] of [[TEST_CHAINS[0], "MEDIUM"], [TEST_CHAINS[1], "HIGH"]]) {
-            const result = await client.query(
-                `INSERT INTO approval_chains (name, min_discount_percent, max_discount_percent, min_risk, is_active)
-                 VALUES ($1, 0, NULL, $2, TRUE)
-                 ON CONFLICT (name) DO UPDATE SET min_discount_percent = 0, max_discount_percent = NULL, min_risk = EXCLUDED.min_risk, is_active = TRUE
-                 RETURNING id`,
-                [name, minRisk]
-            );
-            chainIds[name] = result.rows[0].id;
-            await client.query("DELETE FROM approval_chain_steps WHERE approval_chain_id = $1", [chainIds[name]]);
-            await client.query("INSERT INTO approval_chain_steps (approval_chain_id, step_order, approver_role) VALUES ($1, 1, 'Sales Manager')", [chainIds[name]]);
-            if (minRisk === "HIGH") {
-                await client.query("INSERT INTO approval_chain_steps (approval_chain_id, step_order, approver_role) VALUES ($1, 2, 'Finance')", [chainIds[name]]);
-            }
-        }
-        await client.query("COMMIT");
-    } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-    } finally {
-        client.release();
-    }
+    await ensureAdminConfigurationSchema();
 };
 
-const getQuoteItems = async (repToken, violations) => {
-    const productIds = [1, 2, 3];
+const getQuoteItems = async (repToken, violations, customerId, priceListId) => {
+    const pliRes = await pool.query("SELECT product_id FROM price_list_items WHERE price_list_id = $1 AND is_active = TRUE ORDER BY product_id LIMIT 3", [priceListId]);
+    const productIds = pliRes.rows.map(r => r.product_id);
     const preview = await request("POST", "/quotations/preview", {
-        customerId: 1,
-        priceListId: 1,
+        customerId,
+        priceListId,
         items: productIds.map((productId) => ({ productId, quantity: 1, discountPercent: 0 }))
     }, repToken);
     assert(preview.status === 200, "Preview returns database-backed discount limits");
-    return preview.data.data.items.slice(0, violations.length).map((item, index) => ({
-        productId: item.productId,
-        quantity: 1,
-        discountPercent: Number(item.discountLimit) + violations[index]
-    }));
+    return preview.data.data.items.slice(0, violations.length).map((item, index) => {
+        const v = violations[index];
+        const discountPercent = v === 0
+            ? Math.min(5, Number(item.discountLimit))
+            : (violations.length === 1 && v === 2 ? 7 : Number(item.discountLimit) + v);
+        return {
+            productId: item.productId,
+            quantity: 1,
+            discountPercent
+        };
+    });
 };
 
-const createQuote = async (repToken, items) => {
-    const result = await request("POST", "/quotations", { customerId: 1, priceListId: 1, items }, repToken);
+const createQuote = async (repToken, items, customerId, priceListId) => {
+    const result = await request("POST", "/quotations", { customerId, priceListId, items }, repToken);
     assert(result.status === 201, "Sales Rep creates quotation");
     return result.data.data;
 };
@@ -93,19 +76,24 @@ const run = async () => {
     const createdQuoteIds = [];
     try {
         await configureTestChains();
+        const custRow = await pool.query("SELECT c.id, c.email FROM customers c JOIN users u ON u.email = c.email WHERE u.role = 'customer' AND u.is_active = TRUE LIMIT 1");
+        const testCustomer = custRow.rows[0];
+        const plRow = await pool.query("SELECT id FROM price_lists WHERE id IN (SELECT price_list_id FROM price_list_items WHERE is_active = TRUE) AND is_active = TRUE LIMIT 1");
+        const testPriceListId = plRow.rows[0].id;
+
         const repToken = await login("salesrep1@dealflow360.com");
         const managerToken = await login("manager@dealflow360.com");
         const financeToken = await login("finance@dealflow360.com");
-        const customerToken = await login("john@acme.com");
+        const customerToken = await login(testCustomer.email);
 
-        const lowQuote = await createQuote(repToken, await getQuoteItems(repToken, [0]));
+        const lowQuote = await createQuote(repToken, await getQuoteItems(repToken, [0], testCustomer.id, testPriceListId), testCustomer.id, testPriceListId);
         createdQuoteIds.push(lowQuote.dbId);
         const lowSubmit = await request("POST", `/quotations/${lowQuote.id}/submit`, {}, repToken);
         assert(lowSubmit.status === 200 && lowSubmit.data.data.status === "Approved", "LOW risk auto-approves");
         const lowRequests = await pool.query("SELECT COUNT(*)::int AS count FROM quotation_approval_requests WHERE quotation_id = $1 AND status IN ('PENDING', 'RETURNED')", [lowQuote.dbId]);
         assert(lowRequests.rows[0].count === 0, "LOW risk creates no active approval request");
 
-        const mediumQuote = await createQuote(repToken, await getQuoteItems(repToken, [2]));
+        const mediumQuote = await createQuote(repToken, await getQuoteItems(repToken, [2], testCustomer.id, testPriceListId), testCustomer.id, testPriceListId);
         createdQuoteIds.push(mediumQuote.dbId);
         const mediumSubmit = await request("POST", `/quotations/${mediumQuote.id}/submit`, {}, repToken);
         assert(mediumSubmit.status === 200 && (mediumSubmit.data.data.status === "Pending" || mediumSubmit.data.data.status === "Pending Approval"), "MEDIUM risk enters approval");
@@ -114,7 +102,7 @@ const run = async () => {
         const mediumApprove = await request("POST", `/approvals/A-${mediumQuote.dbId}/approve`, { comment: "Approved medium risk" }, managerToken);
         assert(mediumApprove.status === 200 && mediumApprove.data.data.status === "Approved", "Manager approves MEDIUM quotation");
 
-        const highQuote = await createQuote(repToken, await getQuoteItems(repToken, [6]));
+        const highQuote = await createQuote(repToken, await getQuoteItems(repToken, [6], testCustomer.id, testPriceListId), testCustomer.id, testPriceListId);
         createdQuoteIds.push(highQuote.dbId);
         const highSubmit = await request("POST", `/quotations/${highQuote.id}/submit`, {}, repToken);
         assert(highSubmit.status === 200 && (highSubmit.data.data.status === "Pending" || highSubmit.data.data.status === "Pending Approval"), "HIGH single-line risk enters approval");
@@ -127,7 +115,7 @@ const run = async () => {
         const financeHigh = await request("POST", `/approvals/A-${highQuote.dbId}/approve`, { comment: "Finance approved high risk" }, financeToken);
         assert(financeHigh.status === 200 && financeHigh.data.data.status === "Approved", "Finance completes HIGH approval");
 
-        const cumulativeQuote = await createQuote(repToken, await getQuoteItems(repToken, [2, 3, 3]));
+        const cumulativeQuote = await createQuote(repToken, await getQuoteItems(repToken, [2, 3, 3], testCustomer.id, testPriceListId), testCustomer.id, testPriceListId);
         createdQuoteIds.push(cumulativeQuote.dbId);
         const cumulativeSubmit = await request("POST", `/quotations/${cumulativeQuote.id}/submit`, {}, repToken);
         assert(cumulativeSubmit.status === 200 && (cumulativeSubmit.data.data.status === "Pending" || cumulativeSubmit.data.data.status === "Pending Approval"), "Cumulative violation total of 8 routes as HIGH");

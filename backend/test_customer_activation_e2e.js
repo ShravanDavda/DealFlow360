@@ -74,6 +74,8 @@ async function runTests() {
         assert(salesRepToken && repLoginRes.data.data.user.role === "sales_rep", "Sales rep token obtained");
 
         console.log("\n--- STEP 2: Admin Creates Customer with Portal Account ---");
+        const tierRes = await pool.query("SELECT id FROM customer_tiers LIMIT 1");
+        const validTierId = tierRes.rows[0].id;
         const createRes = await request(
             "POST",
             "/customers",
@@ -83,7 +85,7 @@ async function runTests() {
                 contactName: "Alex Vance",
                 email: testEmail,
                 phone: "+1-555-0199",
-                customerTierId: 1,
+                customerTierId: validTierId,
                 currency: "USD"
             },
             { Authorization: `Bearer ${adminToken}` }

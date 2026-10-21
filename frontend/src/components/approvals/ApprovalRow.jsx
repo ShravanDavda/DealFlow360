@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 const RISK_BADGE_CLASSES = {
   HIGH: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -34,7 +35,7 @@ export const ApprovalRow = ({ approval, onClick, onAction, isSalesManager, isFin
         <span className="mt-1 block w-fit rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs font-medium text-slate-600">{approval.customerTier || '--'} Tier</span>
       </td>
       <td className="px-3 py-4 text-slate-700">{approval.salesRep || '--'}</td>
-      <td className="px-3 py-4 text-slate-700"><span className="font-semibold">${approval.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span><span className="mt-1 block text-xs text-rose-600">-${approval.discount.toLocaleString(undefined, { minimumFractionDigits: 2 })} disc</span></td>
+      <td className="px-3 py-4 text-slate-700"><span className="font-semibold">{formatCurrency(approval.amount)}</span><span className="mt-1 block text-xs text-rose-600">-{formatCurrency(approval.discount)} disc</span></td>
       <td className="px-3 py-4">
         <span
           className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold border tracking-wide ${riskClass}`}

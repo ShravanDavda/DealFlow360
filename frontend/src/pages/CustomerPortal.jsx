@@ -28,6 +28,7 @@ import {
   submitCustomerNegotiation,
   confirmCustomerQuote
 } from '../services/customerPortalService';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 export const CustomerPortal = () => {
   const { quoteId } = useParams();
@@ -69,15 +70,27 @@ export const CustomerPortal = () => {
 
       let combinedHistory = [];
       if (historyData) {
-        const lines = (historyData.negotiationLines || []).map((line) => ({
-          id: `line-${line.id}`,
-          type: line.requestedDiscount ? 'counter_discount' : 'question',
-          title: line.productName || (line.requestedDiscount ? 'Counter-Discount Proposal' : 'Question / Change Request'),
-          comment: line.customerComment,
-          discount: line.requestedDiscount ? Number(line.requestedDiscount) : null,
-          status: line.status || 'Under Review',
-          createdAt: line.createdAt
-        }));
+        const lines = (historyData.negotiationLines || []).map((line) => {
+          const isRep =
+            line.senderRole === 'sales_rep' ||
+            line.senderRole === 'Sales Representative' ||
+            line.messageType === 'sales_reply';
+          return {
+            id: `line-${line.id}`,
+            type: isRep
+              ? 'sales_reply'
+              : (line.requestedDiscount ? 'counter_discount' : 'question'),
+            title: isRep
+              ? (line.senderName ? `${line.senderName} (Sales Rep)` : 'Sales Representative Reply')
+              : (line.productName || (line.requestedDiscount ? 'Counter-Discount Proposal' : 'Question / Inquiry')),
+            comment: line.customerComment || line.message,
+            discount: line.requestedDiscount ? Number(line.requestedDiscount) : null,
+            status: line.status || (isRep ? 'Replied' : 'Under Review'),
+            senderName: line.senderName,
+            senderRole: line.senderRole,
+            createdAt: line.createdAt
+          };
+        });
 
         const audits = (historyData.auditTrail || []).map((audit) => ({
           id: `audit-${audit.id}`,
@@ -98,15 +111,27 @@ export const CustomerPortal = () => {
           (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         );
       } else if (quoteData?.negotiationHistory) {
-        combinedHistory = quoteData.negotiationHistory.map((h) => ({
-          id: `h-${h.id}`,
-          type: h.requestedDiscount ? 'counter_discount' : 'question',
-          title: h.productName || 'Negotiation Entry',
-          comment: h.comment,
-          discount: h.requestedDiscount ? Number(h.requestedDiscount) : null,
-          status: h.status,
-          createdAt: h.createdAt
-        }));
+        combinedHistory = (quoteData.negotiationHistory || []).map((h) => {
+          const isRep =
+            h.senderRole === 'sales_rep' ||
+            h.senderRole === 'Sales Representative' ||
+            h.messageType === 'sales_reply';
+          return {
+            id: `h-${h.id}`,
+            type: isRep
+              ? 'sales_reply'
+              : (h.requestedDiscount ? 'counter_discount' : 'question'),
+            title: isRep
+              ? (h.senderName ? `${h.senderName} (Sales Rep)` : 'Sales Representative Reply')
+              : (h.productName || (h.requestedDiscount ? 'Counter-Discount Proposal' : 'Question / Inquiry')),
+            comment: h.comment || h.customerComment || h.message,
+            discount: h.requestedDiscount ? Number(h.requestedDiscount) : null,
+            status: h.status || (isRep ? 'Replied' : 'Under Review'),
+            senderName: h.senderName,
+            senderRole: h.senderRole,
+            createdAt: h.createdAt
+          };
+        });
       }
       setHistoryItems(combinedHistory);
     } catch (err) {
@@ -381,13 +406,13 @@ export const CustomerPortal = () => {
             <div>
               <span className="text-xs text-slate-500 font-medium">Total Discount</span>
               <p className="text-sm font-semibold text-emerald-600 mt-0.5">
-                -${Number(quote.discountAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                -{formatCurrency(quote.discountAmount || 0)}
               </p>
             </div>
             <div>
               <span className="text-xs text-slate-500 font-medium">Contract Total</span>
               <p className="text-base font-bold text-slate-900 mt-0.5">
-                ${Number(quote.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} {quote.currency}
+                {formatCurrency(quote.totalAmount || 0)}
               </p>
             </div>
           </div>
@@ -497,7 +522,7 @@ export const CustomerPortal = () => {
                         {item.quantity}
                       </td>
                       <td className="py-4 px-4 text-right text-slate-700 font-medium">
-                        ${Number(item.unitPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {formatCurrency(item.unitPrice || 0)}
                       </td>
                       <td className="py-4 px-4 text-right text-slate-700">
                         {Number(item.discountPercent || 0) > 0 ? (
@@ -512,7 +537,7 @@ export const CustomerPortal = () => {
                         {item.taxPercent ? `${item.taxPercent}%` : '0%'}
                       </td>
                       <td className="py-4 pl-4 pr-6 text-right font-semibold text-slate-900">
-                        ${Number(item.lineTotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {formatCurrency(item.lineTotal || 0)}
                       </td>
                     </tr>
                   ))
@@ -525,19 +550,19 @@ export const CustomerPortal = () => {
             <div className="w-full sm:w-80 space-y-2.5 text-sm">
               <div className="flex justify-between text-slate-600">
                 <span>Subtotal</span>
-                <span>${Number(quote.subtotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                <span>{formatCurrency(quote.subtotal || 0)}</span>
               </div>
               <div className="flex justify-between text-emerald-700 font-medium">
                 <span>Total Discount</span>
-                <span>-${Number(quote.discountAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                <span>-{formatCurrency(quote.discountAmount || 0)}</span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Estimated Tax</span>
-                <span>+${Number(quote.taxAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                <span>+{formatCurrency(quote.taxAmount || 0)}</span>
               </div>
               <div className="pt-2 border-t border-slate-200 flex justify-between text-base font-bold text-slate-900">
                 <span>Total Contract Value</span>
-                <span>${Number(quote.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} {quote.currency}</span>
+                <span>{formatCurrency(quote.totalAmount || 0)}</span>
               </div>
             </div>
           </div>
@@ -699,13 +724,13 @@ export const CustomerPortal = () => {
                           Live Contract Estimate ({previewCalculation.discountPercent}% Discount)
                         </span>
                         <p className="text-xs text-slate-600">
-                          Estimated New Total: <strong className="text-slate-900 text-sm font-bold">${previewCalculation.estimatedTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
+                          Estimated New Total: <strong className="text-slate-900 text-sm font-bold">{formatCurrency(previewCalculation.estimatedTotal)}</strong>
                         </p>
                       </div>
                       <div className="bg-white px-3.5 py-1.5 rounded border border-indigo-200 text-center sm:text-right">
                         <span className="text-[11px] text-slate-500 block">Projected Savings</span>
                         <span className="text-sm font-extrabold text-emerald-600">
-                          -${previewCalculation.savings.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          -{formatCurrency(previewCalculation.savings)}
                         </span>
                       </div>
                     </div>
@@ -811,7 +836,7 @@ export const CustomerPortal = () => {
                         <div>
                           <span className="text-xs text-emerald-700 font-medium">Final Contract Value</span>
                           <p className="text-xl font-extrabold text-emerald-950">
-                            ${Number(quote.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} {quote.currency}
+                            {formatCurrency(quote.totalAmount || 0)}
                           </p>
                         </div>
                         <Button
@@ -860,63 +885,80 @@ export const CustomerPortal = () => {
             </p>
           ) : (
             <div className="space-y-3 pt-1">
-              {historyItems.map((item, idx) => (
-                <div 
-                  key={item.id || idx} 
-                  className="p-4 rounded-lg border border-slate-100 bg-slate-50/70 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row sm:items-start justify-between gap-3"
-                >
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                        item.type === 'counter_discount'
-                          ? 'bg-indigo-100 text-indigo-800'
-                          : item.type === 'audit_event'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {item.type === 'counter_discount'
-                          ? 'Counter Discount'
-                          : item.type === 'audit_event'
-                          ? 'Workflow Event'
-                          : 'Customer Inquiry'}
-                      </span>
-
-                      {item.discount > 0 && (
-                        <span className="text-xs font-bold text-emerald-700">
-                          Proposed {item.discount}% Discount
+              {historyItems.map((item, idx) => {
+                const isRep = item.type === 'sales_reply';
+                return (
+                  <div
+                    key={item.id || idx}
+                    className={`p-4 rounded-lg border transition-colors flex flex-col sm:flex-row sm:items-start justify-between gap-3 ${
+                      isRep
+                        ? 'border-blue-200 bg-blue-50/50 hover:bg-blue-50/70'
+                        : 'border-slate-100 bg-slate-50/70 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                          isRep
+                            ? 'bg-blue-100 text-blue-800'
+                            : item.type === 'counter_discount'
+                            ? 'bg-indigo-100 text-indigo-800'
+                            : item.type === 'audit_event'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-slate-200 text-slate-800'
+                        }`}>
+                          {isRep
+                            ? 'Sales Rep Reply'
+                            : item.type === 'counter_discount'
+                            ? 'Counter Discount'
+                            : item.type === 'audit_event'
+                            ? 'Workflow Event'
+                            : 'Customer Inquiry'}
                         </span>
-                      )}
 
-                      <span className="text-xs text-slate-400">
-                        {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}
+                        {item.discount > 0 && (
+                          <span className="text-xs font-bold text-emerald-700">
+                            Proposed {item.discount}% Discount
+                          </span>
+                        )}
+
+                        <span className="text-xs text-slate-400">
+                          {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}
+                        </span>
+                      </div>
+
+                      <div className={`text-sm font-medium pt-0.5 ${isRep ? 'text-blue-950 font-semibold' : 'text-slate-800'}`}>
+                        {item.title}
+                      </div>
+
+                      {item.comment && (
+                        <div className={`flex items-start gap-2 text-xs mt-1 p-2.5 rounded border ${
+                          isRep
+                            ? 'bg-white border-blue-200 text-slate-800 font-normal leading-relaxed'
+                            : 'bg-white border-slate-200/70 text-slate-600'
+                        }`}>
+                          <MessageSquare className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${isRep ? 'text-blue-600' : 'text-slate-400'}`} />
+                          <span className="whitespace-pre-wrap">{item.comment}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="shrink-0 sm:self-center">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        isRep
+                          ? 'bg-blue-100 text-blue-800'
+                          : item.status === 'Approved'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : item.status === 'Under Review' || item.status === 'Pending' || item.status === 'Pending Approval'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-slate-200 text-slate-800'
+                      }`}>
+                        {isRep ? 'Replied' : (item.status || 'Logged')}
                       </span>
                     </div>
-
-                    <div className="text-sm text-slate-800 font-medium pt-0.5">
-                      {item.title}
-                    </div>
-
-                    {item.comment && (
-                      <div className="flex items-start gap-2 text-xs text-slate-600 mt-1 bg-white p-2.5 rounded border border-slate-200/70">
-                        <MessageSquare className="h-3.5 w-3.5 text-slate-400 mt-0.5 shrink-0" />
-                        <span>{item.comment}</span>
-                      </div>
-                    )}
                   </div>
-
-                  <div className="shrink-0 sm:self-center">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                      item.status === 'Approved' 
-                        ? 'bg-emerald-100 text-emerald-800' 
-                        : item.status === 'Under Review' || item.status === 'Pending' || item.status === 'Pending Approval'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-slate-200 text-slate-800'
-                    }`}>
-                      {item.status || 'Logged'}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
@@ -963,11 +1005,11 @@ export const CustomerPortal = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Total Discount:</span>
-                  <span className="font-medium text-emerald-700">-${Number(quote.discountAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span className="font-medium text-emerald-700">-{formatCurrency(quote.discountAmount || 0)}</span>
                 </div>
                 <div className="pt-2 border-t border-slate-200 flex justify-between text-sm font-bold text-slate-900">
                   <span>Final Total:</span>
-                  <span>${Number(quote.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} {quote.currency}</span>
+                  <span>{formatCurrency(quote.totalAmount || 0)}</span>
                 </div>
               </div>
 
