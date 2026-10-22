@@ -1,489 +1,360 @@
 # DealFlow360
 
-### Sales Operations & Deal Management Platform
+**A Full-Stack Deal Management & Sales Workflow Platform**
 
-[![Live Application](https://img.shields.io/badge/Live%20App-dealflow360--frontend.onrender.com-brightgreen?style=for-the-badge&logo=render)](https://dealflow360-frontend.onrender.com/)
-[![Backend API](https://img.shields.io/badge/API-dealflow360--backend--48n8.onrender.com-blue?style=for-the-badge)](https://dealflow360-backend-48n8.onrender.com/api/health)
+DealFlow360 is a full-stack business application designed to manage the complete sales deal lifecycle, from customer and product management to quotation creation, discount governance, approval workflows, negotiation, and fulfillment.
 
----
+The platform centralizes deal-related operations, enforces role-based access, and provides structured workflows that improve visibility, accountability, and control across sales and finance teams.
 
-## 🌐 Live Production Links
-
-- **🚀 Live Web Application**: [https://dealflow360-frontend.onrender.com](https://dealflow360-frontend.onrender.com/)
-- **⚡ Backend REST API**: [https://dealflow360-backend-48n8.onrender.com/api](https://dealflow360-backend-48n8.onrender.com/api)
-- **🩺 API Health Endpoint**: [https://dealflow360-backend-48n8.onrender.com/api/health](https://dealflow360-backend-48n8.onrender.com/api/health)
-
-### 🔑 Pre-Configured Demo Accounts (All passwords: `password123`)
-
-| Role | Email | Password | Dashboard Features |
-| :--- | :--- | :--- | :--- |
-| **Sales Rep** | `salesrep1@dealflow360.com` | `password123` | Quotation Builder, Customer Pipeline, Margin Preview |
-| **Sales Manager** | `manager@dealflow360.com` | `password123` | Approval Queue, Risk Scoring, Nudge/Escalate Actions |
-| **Finance** | `finance@dealflow360.com` | `password123` | Multi-tier High Risk Approvals, Invoice Billing, Payments |
-| **Admin** | `admin@dealflow360.com` | `password123` | Master Catalogs, Approval Chains, Warehouse Splits |
+Developed as a **hackathon project**.
 
 ---
 
-DealFlow360 is a full-stack sales operations platform designed to centralize deal management, user workflows, and role-based business operations in a single application.
+## Table of Contents
 
-The project is built with a modern React frontend and a Node.js/Express backend backed by PostgreSQL, with authentication (Email/Password, Google OAuth 2.0, and Password Recovery via Email OTP) and API-driven communication between the client and server.
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [User Roles](#user-roles)
+- [Core Business Workflow](#core-business-workflow)
+- [Technology Stack](#technology-stack)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Environment Configuration](#environment-configuration)
+- [Running the Application](#running-the-application)
+- [Security](#security)
+- [Development Notes](#development-notes)
+- [Future Improvements](#future-improvements)
 
-> **Built for:** Odoo Hackathon 2026
-> **Project Type:** Full-Stack Web Application
-
----
-
-## Customer Activation & Password Recovery Email
-
-Customer activation tokens and password reset OTPs are generated securely by the backend, stored only as hashes, and expire automatically. Configure email delivery with these backend environment variables:
-
-```env
-BREVO_API_KEY=your_brevo_api_key_here
-BREVO_SENDER_EMAIL=noreply@dealflow360.com
-BREVO_SENDER_NAME=DealFlow360
-```
-
-When email delivery is not configured or fails, the Admin still receives the raw token from the Admin-only customer activation response and the UI clearly reports that email delivery failed.
 ---
 
 ## Overview
 
-Sales teams often work across disconnected tools for managing deals, tracking business activity, coordinating different roles, and accessing operational information.
+Managing business deals involves multiple interconnected activities, including maintaining product prices, preparing quotations, evaluating discounts, obtaining approvals, communicating with customers, and fulfilling orders.
 
-**DealFlow360** brings these workflows into one platform with a role-oriented architecture and a dedicated backend API.
+DealFlow360 brings these activities into a unified application.
 
-The application follows a client-server architecture:
+The platform is designed around three principles:
 
-```text
-┌──────────────────────────────┐
-│        React Frontend        │
-│                              │
-│ React • Vite • Tailwind CSS  │
-│ React Router • Axios         │
-└──────────────┬───────────────┘
-               │
-               │ REST API
-               ▼
-┌──────────────────────────────┐
-│       Node.js Backend        │
-│                              │
-│ Express • JWT • bcrypt       │
-│ Authentication & Business    │
-│ Logic                        │
-└──────────────┬───────────────┘
-               │
-               │ PostgreSQL
-               ▼
-┌──────────────────────────────┐
-│         PostgreSQL           │
-│                              │
-│ Relational Data & Persistence│
-└──────────────────────────────┘
-```
+- **Workflow automation:** Reduce unnecessary manual coordination through structured business processes.
+- **Role-based access:** Ensure users can access the features and operations appropriate to their roles.
+- **Business rule enforcement:** Apply server-side validation to critical operations such as quotation calculations, discount limits, and approval decisions.
 
----
+## Key Features
 
-## Key Highlights
+### 1. Authentication & User Management
+- User authentication and protected application routes.
+- Role-based access control.
+- Google authentication integration.
+- Password recovery functionality.
+- Customer account management and activation workflows.
 
-- Full-stack React + Node.js application
-- REST API based frontend-backend communication
-- PostgreSQL relational database
-- JWT-based authentication
-- Password hashing with bcrypt
-- Role-oriented application workflows
-- Responsive React interface
-- Client-side routing with React Router
-- Axios-based API integration
-- Tailwind CSS based UI
-- Modular frontend and backend separation
+### 2. Customer Management
+- Centralized customer information.
+- Customer-tier-based discount policies.
+- Customer access to relevant deal and negotiation workflows.
+- Role-appropriate customer information and actions.
+
+### 3. Product & Pricing Management
+- Product catalog management.
+- Product pricing and price list management.
+- Price list item-level management.
+- Category-based discount ceilings.
+- Customer-tier discount ceilings.
+
+### 4. Quotation Management
+- Create and manage quotations.
+- Calculate quotation totals and discounts.
+- Evaluate applicable discount ceilings.
+- Recalculate critical quotation information on the backend.
+- Track quotation status throughout the business workflow.
+
+### 5. Discount Governance & Risk Assessment
+- Evaluate discounts against applicable business rules.
+- Apply the strictest applicable discount ceiling.
+- Assess quotation risk using the application's risk-calculation logic.
+- Support configurable discount and risk-based approval policies.
+
+### 6. Configurable Approval Workflows
+- Configure approval chains and sequential approval steps.
+- Assign approval responsibilities to appropriate roles.
+- Support different approval requirements based on configured rules.
+- Track pending, completed, and returned approval requests.
+- Prevent unauthorized approval actions through backend validation.
+
+### 7. Customer Negotiation
+- Support quotation negotiation between sales representatives and customers.
+- Enable two-way negotiation communication.
+- Track negotiation-related updates.
+- Integrate negotiation with the existing quotation workflow.
+
+### 8. Order Fulfillment
+- Support fulfillment-related workflows for authorized roles.
+- Track relevant fulfillment activities and statuses.
+- Maintain separation between sales, finance, and fulfillment responsibilities.
+
+### 9. Dashboards & Operational Visibility
+- Role-specific dashboards and navigation.
+- Access to relevant sales and operational information.
+- Deal-related summaries and workflow visibility according to user permissions.
+
+### 10. Currency Formatting
+- Standardized monetary presentation across the user interface.
+- Consistent formatting of displayed financial values.
 
 ---
 
 ## User Roles
 
-DealFlow360 is designed around role-specific business workflows.
+DealFlow360 uses role-based permissions to separate responsibilities across the business workflow.
 
-The platform supports:
+| Role | Primary Responsibilities |
+|---|---|
+| Admin | Manage users, customers, products, pricing, discount policies, and approval configuration. |
+| Sales Representative | Manage sales activities, prepare quotations, and coordinate customer negotiations. |
+| Sales Manager | Review and approve quotations requiring managerial approval. |
+| Finance / Operator | Perform assigned finance-related operations and handle finance approval steps where authorized. |
+| Warehouse / Fulfillment | Perform authorized fulfillment and order-processing activities. |
+| Customer | Access permitted customer-facing features, including relevant quotation and negotiation workflows. |
 
-- **Admin**
-- **Sales Representative**
-- **Manager**
-- **Finance Manager**
-
-Each role can interact with the application according to its responsibilities and permissions.
-
-This role-oriented structure allows business workflows to be separated while keeping the underlying platform centralized.
+Actual permissions depend on the application's configured role identifiers and backend authorization rules.
 
 ---
 
-## Core Architecture
+## Core Business Workflow
 
-DealFlow360 follows a conventional three-layer web application architecture:
+A typical deal progresses through the following stages:
 
-### Frontend
+1. **Customer and product selection** — The sales representative selects the relevant customer and products.
+2. **Quotation preparation** — Quotation line items, prices, quantities, and discounts are entered.
+3. **Business rule validation** — The backend recalculates quotation values and evaluates applicable discount limits.
+4. **Risk assessment** — The quotation is evaluated using the configured risk-calculation logic.
+5. **Approval routing** — The system determines whether the quotation can be approved automatically or requires an approval chain.
+6. **Sequential approvals** — Required approvers review the quotation in the configured order.
+7. **Customer negotiation** — The sales representative and customer communicate through the supported negotiation workflow.
+8. **Order processing and fulfillment** — Authorized users perform the subsequent operations when the workflow permits them.
 
-The frontend is built with React and Vite.
-
-Responsibilities include:
-
-- User interface
-- Client-side routing
-- Form handling
-- API communication
-- Application state
-- Role-based views
-- Responsive UI
-
-### Backend
-
-The backend is implemented using Node.js and Express.
-
-Responsibilities include:
-
-- HTTP request handling
-- REST API endpoints
-- Authentication
-- Authorization logic
-- Business logic
-- Database interaction
-- Error handling
-
-### Database
-
-PostgreSQL provides persistent relational storage for application data.
-
-The backend communicates with PostgreSQL using the Node.js `pg` driver.
+The exact path depends on quotation risk, configured approval chains, customer interactions, and the application's business rules.
 
 ---
 
 ## Technology Stack
 
 ### Frontend
-
-| Technology | Purpose |
-|---|---|
-| React 18 | UI development |
-| Vite | Frontend tooling and development server |
-| React Router | Client-side routing |
-| Axios | HTTP/API communication |
-| Tailwind CSS | Styling |
-| Lucide React | UI icons |
-| jsPDF | PDF generation |
+- React
+- Vite
+- JavaScript
+- Tailwind CSS
+- React Router
+- Axios
 
 ### Backend
-
-| Technology | Purpose |
-|---|---|
-| Node.js | Server-side JavaScript runtime |
-| Express 5 | REST API framework |
-| JSON Web Tokens | Authentication |
-| bcrypt | Password hashing |
-| CORS | Cross-origin request handling |
-| dotenv | Environment configuration |
+- Node.js
+- Express.js
+- JavaScript (ES modules)
 
 ### Database
+- PostgreSQL
 
-| Technology | Purpose |
-|---|---|
-| PostgreSQL | Relational database |
-| `pg` | PostgreSQL client for Node.js |
+### Authentication & Integrations
+- JSON Web Tokens (JWT)
+- Google OAuth
+- Email-based password recovery
 
-### Development
-
-- Git
-- GitHub
-- npm
-- VS Code
+The stack listed above reflects the project's established architecture. Confirm exact package versions and any additional libraries from the repository's package manifests.
 
 ---
 
 ## Project Structure
 
+The repository contains separate frontend and backend applications.
+
 ```text
 DealFlow360/
-│
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── services/
+│   │   ├── hooks/
+│   │   ├── context/
+│   │   ├── layouts/
+│   │   ├── utils/
+│   │   └── ...
+│   ├── package.json
+│   └── ...
 ├── backend/
 │   ├── src/
+│   │   ├── config/
+│   │   ├── routes/
+│   │   ├── controllers/
+│   │   ├── services/
+│   │   ├── middleware/
+│   │   └── ...
 │   ├── package.json
 │   └── ...
-│
-├── frontend/
-│   ├── src/
-│   ├── public/
-│   ├── package.json
-│   └── ...
-│
-├── .gitignore
-├── DealFlow360_Admin_Configuration_Copilot_Prompt.md
-├── svgdealflow360_test_report.md
 └── README.md
 ```
 
-The frontend and backend are maintained as separate applications, allowing each layer to be developed, tested, and deployed independently.
+*Note: This is a high-level overview. Refer to the actual repository for the complete directory structure.*
 
 ---
 
-## Authentication
-
-DealFlow360 uses token-based authentication.
-
-The authentication flow follows the general pattern:
-
-```text
-User
-  │
-  │ Login credentials
-  ▼
-React Frontend
-  │
-  │ HTTP request
-  ▼
-Express API
-  │
-  ├── Validate credentials
-  ├── Verify password
-  └── Generate JWT
-  │
-  ▼
-Authenticated Session
-```
-
-Passwords are protected using **bcrypt**, while authenticated requests use **JSON Web Tokens (JWT)**.
-
----
-
-## API-Driven Architecture
-
-The frontend communicates with the backend through HTTP APIs.
-
-```text
-React UI
-   │
-   │ Axios
-   ▼
-Express REST API
-   │
-   ├── Authentication
-   ├── Business Logic
-   └── Data Access
-   │
-   ▼
-PostgreSQL
-```
-
-This separation keeps presentation logic independent from backend business logic and database operations.
-
----
-
-## Local Development
+## Getting Started
 
 ### Prerequisites
 
-Make sure the following are installed:
+Install the following before running the application:
 
-- Node.js
-- npm
-- PostgreSQL
-- Git
+- Node.js and npm.
+- PostgreSQL.
+- Git.
 
-### 1. Clone the repository
+### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/ShravanDavda/DealFlow360.git
-
+git clone <repository-url>
 cd DealFlow360
 ```
 
-### 2. Backend setup
+Replace `<repository-url>` with the actual repository URL.
 
-```bash
-cd backend
-npm install
-```
-
-Create the required environment configuration:
-
-```env
-PORT=5000
-DATABASE_URL=your_postgresql_connection_string
-JWT_SECRET=your_jwt_secret
-```
-
-Start the backend:
-
-```bash
-npm run dev
-```
-
-The backend uses Node.js with Express and connects to PostgreSQL.
-
-### 3. Frontend setup
-
-Open another terminal:
+### 2. Install Frontend Dependencies
 
 ```bash
 cd frontend
 npm install
 ```
 
-Start the development server:
+### 3. Install Backend Dependencies
 
 ```bash
+cd ../backend
+npm install
+```
+
+### 4. Configure PostgreSQL
+
+Create a PostgreSQL database and configure the backend connection using the environment variables expected by the project.
+
+Apply the project's existing database schema and migrations, if applicable, before starting the application.
+
+Do not assume that starting the backend will create every required table or database function.
+
+### 5. Configure Environment Variables
+
+Create the appropriate local environment files using the project's existing environment variable names and configuration.
+
+See [Environment Configuration](#environment-configuration).
+
+### 6. Start the Application
+
+Start the backend and frontend using the scripts defined in their respective `package.json` files.
+
+See [Running the Application](#running-the-application).
+
+---
+
+## Environment Configuration
+
+The application may require configuration for:
+
+| Configuration | Purpose |
+|---|---|
+| PostgreSQL connection | Connect the backend to the database. |
+| Server port | Configure the backend listening port. |
+| JWT secret | Sign and verify authentication tokens. |
+| Google OAuth credentials | Enable Google authentication. |
+| Frontend application URL | Configure permitted frontend origins and redirects. |
+| Email service credentials | Support password recovery and related email workflows. |
+
+Use the exact variable names required by the existing source code and environment configuration files.
+
+**Security guidelines:**
+- Never commit `.env` files containing secrets.
+- Do not expose backend credentials or JWT secrets in frontend variables.
+- Keep OAuth credentials and email-service credentials private.
+- Provide a sanitized `.env.example` containing variable names and placeholder values, not real secrets.
+
+---
+
+## Running the Application
+
+Open separate terminals from the repository root.
+
+**Terminal 1 — Backend**
+
+```bash
+cd backend
 npm run dev
 ```
 
-Vite will provide the local development URL.
+Use this command only if the backend package defines a `dev` script. Otherwise, use the existing development or start script.
 
----
+**Terminal 2 — Frontend**
 
-## Environment Variables
-
-Sensitive configuration should never be committed to the repository.
-
-Use environment variables for values such as:
-
-```env
-DATABASE_URL=
-JWT_SECRET=
-PORT=
+```bash
+cd frontend
+npm run dev
 ```
 
-For production deployments, configure these variables through the hosting platform rather than committing secrets to Git.
+Open the local URL printed by Vite in the terminal.
 
----
+For production build verification, run:
 
-## Engineering Decisions
-
-### Why React?
-
-React provides a component-based architecture that makes it easier to build reusable UI elements and role-specific application views.
-
-### Why Express?
-
-Express provides a lightweight backend framework for building REST APIs and organizing server-side business logic.
-
-### Why PostgreSQL?
-
-DealFlow360 uses a relational database because sales and operational workflows naturally involve structured entities and relationships.
-
-### Why JWT?
-
-JWT provides a stateless mechanism for carrying authenticated user information between the client and API.
-
-### Why bcrypt?
-
-Passwords should never be stored as plain text. bcrypt provides password hashing before credentials are persisted.
-
----
-
-## Security Considerations
-
-The application incorporates several basic security practices:
-
-- Password hashing with bcrypt
-- JWT-based authentication
-- Environment-based secret configuration
-- CORS configuration
-- Separation of frontend and backend
-- Database credentials kept outside source code
-
-> Production deployments should additionally use HTTPS, strong secret management, request validation, rate limiting, secure cookie/token handling where appropriate, and centralized error handling.
-
----
-
-## Development Workflow
-
-The repository is organized as a separate frontend/backend codebase to keep responsibilities clear:
-
-```text
-Frontend
-   ↓
-API Contract
-   ↓
-Backend
-   ↓
-Database
+```bash
+cd frontend
+npm run build
 ```
 
-This structure also makes it easier to independently evolve the UI, API layer, and persistence layer.
+Use the scripts actually defined in each package manifest if they differ from these examples.
 
 ---
 
-## Screenshots
+## Security
 
-Add screenshots of the major application workflows here.
+DealFlow360 incorporates security measures appropriate to a role-based business application, including:
 
-### Login
+- Server-side authentication and authorization checks.
+- Protected application routes.
+- Backend validation of critical business operations.
+- Server-side quotation recalculation during submission.
+- Approval-stage and approver-role enforcement.
+- Environment-based management of sensitive credentials.
 
-_Add screenshot_
+Client-side navigation restrictions are not a substitute for backend authorization. Critical business rules must be enforced on the server.
 
-### Dashboard
+---
 
-_Add screenshot_
+## Development Notes
 
-### Deal Management
+- Keep frontend and backend responsibilities clearly separated.
+- Preserve the existing JavaScript and Express architecture when extending the application.
+- Use the existing database schema and migration conventions.
+- Validate approval and pricing changes against existing business rules.
+- Preserve access for other authorized roles when modifying role-specific features.
+- Verify changes with the available build and regression checks before release.
 
-_Add screenshot_
+## Future Improvements
 
-### Role-Specific Views
+Potential areas for future development include:
 
-_Add screenshot_
+- Expanded automated regression and end-to-end test coverage.
+- More detailed audit trails for quotation and approval decisions.
+- Enhanced workflow reporting and analytics.
+- Improved operational monitoring and error reporting.
+- Additional integration and deployment automation.
+
+These are potential enhancements, not claims that the features are currently implemented.
 
 ---
 
 ## Project Status
 
-**Status:** Hackathon project / actively maintainable
+DealFlow360 is a hackathon-developed full-stack business application focused on sales deal management, quotation processing, configurable approvals, customer negotiation, and operational workflows.
 
-The core application is structured as a full-stack web platform with separate frontend and backend services.
-
-Future improvements can include:
-
-- Automated testing
-- API documentation
-- Advanced filtering and search
-- Pagination
-- Audit logging
-- Improved observability
-- CI/CD automation
-- Production deployment
-- More granular role and permission management
+The repository's current source code and database configuration are the authoritative references for implemented features and supported deployment procedures.
 
 ---
 
-## What This Project Demonstrates
-
-DealFlow360 demonstrates practical experience with:
-
-- Full-stack application development
-- React component architecture
-- REST API integration
-- Node.js and Express backend development
-- PostgreSQL database integration
-- Authentication
-- Password security
-- Role-oriented application design
-- Frontend/backend separation
-- Git-based development workflow
-
----
-
-## Hackathon
-
-Built as part of **Odoo Hackathon 2026**.
-
-The project was developed under hackathon constraints with a focus on rapidly translating a business workflow into a working full-stack application.
-
----
-
-## License
-
-This project is intended for educational and hackathon purposes.
-
----
-
-## Author
-
-**Shravan Davda**
-
-GitHub: [@ShravanDavda](https://github.com/ShravanDavda)
+**DealFlow360 — Bringing deal management and business workflows together.**
